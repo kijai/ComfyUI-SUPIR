@@ -85,7 +85,7 @@ class SUPIR_Upscale:
             new_height = H // 64 * 64
             new_width = W // 64 * 64
             image = image.permute(0, 3, 1, 2).contiguous()
-            resized_image = F.interpolate(image, size=(new_height, new_width), mode=resize_method, align_corners=False)
+            resized_image = F.interpolate(image, size=(new_height, new_width), mode='bicubic', align_corners=False)
             
             captions_list = []
             captions_list.append(captions)
