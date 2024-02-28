@@ -5,6 +5,9 @@
 
 WARNING: currently downloads 10GB clip model as I didn't figure out a way to use existing ones yet
 
+-------------------------------------------
+
+
 Original repo:
 https://github.com/Fanghua-Yu/SUPIR
 
