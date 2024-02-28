@@ -7,10 +7,7 @@ from omegaconf import OmegaConf
 import comfy.model_management
 import folder_paths
 from nodes import ImageScaleBy
-from nodes import ImageScale
 import torch.cuda
-from .SUPIR.models.SUPIR_model import SUPIRModel
-from PIL import Image
 from .sgm.util import instantiate_from_config
 script_directory = os.path.dirname(os.path.abspath(__file__))
 
@@ -22,15 +19,19 @@ class SUPIR_Upscale:
             "supir_model": (folder_paths.get_filename_list("checkpoints"), ),
             "sdxl_model": (folder_paths.get_filename_list("checkpoints"), ),
             "image": ("IMAGE", ),
+            "seed": ("INT", {"default": 123,"min": 0, "max": 0xffffffffffffffff, "step": 1}),
             "resize_method": (s.upscale_methods, {"default": "lanczos"}),
             "scale_by": ("FLOAT", {"default": 1.0, "min": 0.01, "max": 20.0, "step": 0.01}),
             "steps": ("INT", {"default": 45, "min": 3, "max": 4096, "step": 1}),
+            "restoration_scale": ("FLOAT", {"default": -1.0, "min": -1.0, "max": 6.0, "step": 1.0}),
             "cfg_scale": ("FLOAT", {"default": 7.5,"min": 0, "max": 20, "step": 0.01}),
-            "a_prompt": ("STRING", {"multiline": True, "default": "high quality",}),
-            "n_prompt": ("STRING", {"multiline": True, "default": "illustration",}),
-
-            "min_size": ("INT", {"default": 1024, "min": 1, "max": 4096, "step": 1}),
-          
+            "a_prompt": ("STRING", {"multiline": True, "default": "high quality, detailed",}),
+            "n_prompt": ("STRING", {"multiline": True, "default": "bad quality, blurry, messy",}),
+            "s_churn": ("INT", {"default": 5,"min": 0, "max": 40, "step": 1}),
+            "s_noise": ("FLOAT", {"default": 1.003,"min": 1.0, "max": 1.1, "step": 0.001}),
+            "control_scale": ("FLOAT", {"default": 1.0, "min": 0, "max": 1, "step": 0.05}),
+            "cfg_scale_start": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 9.0, "step": 0.05}),
+            "control_scale_start": ("FLOAT", {"default": 0.0, "min": 0, "max": 1.0, "step": 0.05}),
             "color_fix_type": (
             [   
                 'None',
@@ -39,9 +40,11 @@ class SUPIR_Upscale:
             ], {
                "default": 'Wavelet'
             }),
-            "keep_model_loaded": ("BOOLEAN", {"default": False}),
-            "seed": ("INT", {"default": 123,"min": 0, "max": 0xffffffffffffffff, "step": 1}),
+            "keep_model_loaded": ("BOOLEAN", {"default": True}),
             },
+            "optional": {
+                "captions": ("STRING", {"forceInput": True, "multiline": False, "default": "",}),
+            }
             
             
             }
@@ -52,11 +55,11 @@ class SUPIR_Upscale:
 
     CATEGORY = "SUPIR"
 
-    def process(self, steps, image, color_fix_type, seed, scale_by, min_size, cfg_scale, resize_method, 
-                a_prompt, n_prompt, sdxl_model,  supir_model, keep_model_loaded):
-        torch.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)
-        comfy.model_management.unload_all_models()
+    def process(self, steps, image, color_fix_type, seed, scale_by, cfg_scale, resize_method, s_churn, s_noise, 
+                control_scale, cfg_scale_start, control_scale_start, restoration_scale, keep_model_loaded,
+                a_prompt, n_prompt, sdxl_model, supir_model, captions=""):
+        
+        
         device = comfy.model_management.get_torch_device()
         image = image.to(device)
         SUPIR_MODEL_PATH = folder_paths.get_full_path("checkpoints", supir_model)
@@ -78,30 +81,27 @@ class SUPIR_Upscale:
         autocast_condition = dtype == torch.float16 or torch.bfloat16 and not comfy.model_management.is_device_mps(device)
         with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=dtype) if autocast_condition else nullcontext():
             image, = ImageScaleBy.upscale(self, image, resize_method, scale_by)
-        
-            # Assuming 'image' is a PyTorch tensor with shape [B, H, W, C] and you want to resize it.
             B, H, W, C = image.shape
-
-            # Calculate the new height and width, rounding down to the nearest multiple of 64.
             new_height = H // 64 * 64
             new_width = W // 64 * 64
-
-            # Reorder to [B, C, H, W] before using interpolate.
             image = image.permute(0, 3, 1, 2).contiguous()
-
-            # Resize the image tensor.
-            resized_image = F.interpolate(image, size=(new_height, new_width), mode='bicubic', align_corners=False)
+            resized_image = F.interpolate(image, size=(new_height, new_width), mode=resize_method, align_corners=False)
             
-            captions = ['']
-            print(captions)
-
+            captions_list = []
+            captions_list.append(captions)
+            print(captions_list)
+            
+            use_linear_CFG = cfg_scale_start > 0
+            use_linear_control_scale = control_scale_start > 0
             # # step 3: Diffusion Process
-            samples = self.model.batchify_sample(resized_image, captions, num_steps=steps, restoration_scale= -1, s_churn=5,
-                                            s_noise=1.003, cfg_scale=cfg_scale, control_scale= 1, seed=seed,
+            samples = self.model.batchify_sample(resized_image, captions_list, num_steps=steps, restoration_scale= restoration_scale, s_churn=s_churn,
+                                            s_noise=s_noise, cfg_scale=cfg_scale, control_scale=control_scale, seed=seed,
                                             num_samples=1, p_p=a_prompt, n_p=n_prompt, color_fix_type=color_fix_type,
-                                            use_linear_CFG=False, use_linear_control_scale=False,
-                                            cfg_scale_start=1.0, control_scale_start=0)
+                                            use_linear_CFG=use_linear_CFG, use_linear_control_scale=use_linear_control_scale,
+                                            cfg_scale_start=cfg_scale_start, control_scale_start=control_scale_start)
             # save
+            if not keep_model_loaded:
+                self.model = None
             print(samples.shape)
             samples = samples.permute(0, 2, 3, 1).cpu()
             
