@@ -37,7 +37,7 @@ class SUPIR_Upscale:
                 'AdaIn',
                 'Wavelet',
             ], {
-               "default": 'adain'
+               "default": 'Wavelet'
             }),
             "keep_model_loaded": ("BOOLEAN", {"default": False}),
             "seed": ("INT", {"default": 123,"min": 0, "max": 0xffffffffffffffff, "step": 1}),
