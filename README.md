@@ -22,6 +22,7 @@ Original: https://github.com/kijai/ComfyUI-SUPIR/assets/40791699/33621520-a429-4
 
 Upscaled 3x: https://github.com/kijai/ComfyUI-SUPIR/assets/40791699/d6c60e0a-11c3-496d-82c6-a724758a131a
 
+Image upscale from 3x from 512p:
 https://github.com/kijai/ComfyUI-SUPIR/assets/40791699/545ddce4-8324-45cb-a545-6d1f527d8750
 
 
