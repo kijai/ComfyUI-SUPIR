@@ -12,12 +12,16 @@ or if you use portable (run this in ComfyUI_windows_portable -folder):
 
 `python_embeded\python.exe -m pip install -r ComfyUI\custom_nodes\ComfyUI-SUPIR\requirements.txt`
 
-Additionally xformers might be necessary.
+Additionally `xformers` seems to currently be necessary, a safe way (often problem on Windows) to install/update it is with:
+
+`pip install -U xformers --no-dependencies`
 
 Get the SUPIR model(s) from the original links below, they are loaded from the normal `ComfyUI/models/checkpoints` -folder
 In addition you need an SDXL model, they are loaded from the same folder.
 
 I have not included llava in this, but you can input any captions to the node and thus use anything you want to generate them, or just don't, seems to work great even without.
+
+Memory requirements are directly related to the input image resolution, the "scale_by" in the node simply scales the input, you can leave it at 1.0 and size your input with any other node as well. In my testing I was able to run 512x512 to 1024x1024 with a 10GB 3080 GPU, and other tests on 24GB GPU to up 3072x3072. System RAM requirements are also hefty, don't know numbers but I would guess under 32GB is going to have issues, tested with 64GB.
 
 ## WARNING: currently downloads 10GB clip model as I didn't figure out a way to use existing ones yet
 
