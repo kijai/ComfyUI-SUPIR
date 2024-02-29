@@ -15,6 +15,8 @@ script_directory = os.path.dirname(os.path.abspath(__file__))
 class SUPIR_Upscale:
     def __init__(self):
         self.current_sdxl_model = None
+        self.current_diffusion_dtype = None
+        self.current_encoder_dtype = None
     upscale_methods = ["nearest-exact", "bilinear", "area", "bicubic", "lanczos"]
     @classmethod
     def INPUT_TYPES(s):
@@ -94,32 +96,36 @@ class SUPIR_Upscale:
 
         if diffusion_dtype == 'auto':
             if comfy.model_management.should_use_bf16():
-                print("Using bf16")
+                print("Diffusion using bf16")
                 dtype = torch.bfloat16
                 model_dtype = 'bf16'
             elif comfy.model_management.should_use_fp16():
-                print("Using fp16")
+                print("Diffusion using using fp16")
                 dtype = torch.float16
                 model_dtype = 'fp16'
             else:
-                print("Using fp32")
+                print("Diffusion using using fp32")
                 dtype = torch.float32
                 model_dtype = 'fp32'
         else:
+            print(f"Diffusion using using {diffusion_dtype}")
             dtype = convert_dtype(diffusion_dtype)
             model_dtype = convert_dtype(diffusion_dtype)
 
         if encoder_dtype == 'auto':
             if comfy.model_management.should_use_bf16():
-                print("Using bf16")
+                print("Encoder using bf16")
                 vae_dtype = 'bf16'
             else:
-                print("Using fp32")
+                print("Encoder using using fp32")
                 vae_dtype = 'fp32'
         else:
             vae_dtype = encoder_dtype
+            print(f"Encoder using using {vae_dtype}")
 
-        if not hasattr(self, "model") or self.model is None or self.current_sdxl_model != sdxl_model:
+        if not hasattr(self, "model") or self.model is None or self.current_sdxl_model != sdxl_model or self.current_diffusion_dtype != diffusion_dtype or self.current_encoder_dtype != encoder_dtype:
+            self.current_diffusion_dtype = diffusion_dtype
+            self.current_encoder_dtype = encoder_dtype
             self.current_sdxl_model = sdxl_model
             config = OmegaConf.load(config_path)
             config.model.params.ae_dtype = vae_dtype
