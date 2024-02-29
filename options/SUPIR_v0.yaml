@@ -72,6 +72,7 @@ model:
             input_key: txt
             target: .sgm.modules.encoders.modules.FrozenCLIPEmbedder
             params:
+              version: openai/clip-vit-large-patch14
               layer: hidden
               layer_idx: 11
           # crossattn and vector cond

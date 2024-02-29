@@ -24,6 +24,8 @@ class SUPIR_Upscale:
         return {"required": {
             "supir_model": (folder_paths.get_filename_list("checkpoints"), ),
             "sdxl_model": (folder_paths.get_filename_list("checkpoints"), ),
+            "sdxl_clip1": (folder_paths.get_filename_list("clip_vision"), ),
+            "sdxl_clip2": (folder_paths.get_filename_list("clip_vision"), ),
             "image": ("IMAGE", ),
             "seed": ("INT", {"default": 123,"min": 0, "max": 0xffffffffffffffff, "step": 1}),
             "resize_method": (s.upscale_methods, {"default": "lanczos"}),
@@ -81,7 +83,7 @@ class SUPIR_Upscale:
 
     def process(self, steps, image, color_fix_type, seed, scale_by, cfg_scale, resize_method, s_churn, s_noise, encoder_tile_size_pixels, decoder_tile_size_latent,
                 control_scale, cfg_scale_start, control_scale_start, restoration_scale, keep_model_loaded, 
-                a_prompt, n_prompt, sdxl_model, supir_model, use_tiled_vae, captions="", diffusion_dtype="auto", encoder_dtype="auto"):
+                sdxl_clip1, sdxl_clip2, a_prompt, n_prompt, sdxl_model, supir_model, use_tiled_vae, captions="", diffusion_dtype="auto", encoder_dtype="auto"):
         
         
         device = comfy.model_management.get_torch_device()
@@ -89,6 +91,9 @@ class SUPIR_Upscale:
         
         SUPIR_MODEL_PATH = folder_paths.get_full_path("checkpoints", supir_model)
         SDXL_MODEL_PATH = folder_paths.get_full_path("checkpoints", sdxl_model)
+        SDXL_CLIP1_PTH = folder_paths.get_full_path("clip_vision", sdxl_clip1)
+        SDXL_CLIP1_PTH = SDXL_CLIP1_PTH[:SDXL_CLIP1_PTH.rfind(os.path.sep) + 1]
+        SDXL_CLIP2_CKPT_PTH = folder_paths.get_full_path("clip_vision", sdxl_clip2)
         
         config_path = os.path.join(script_directory, "options/SUPIR_v0.yaml")
 
@@ -128,6 +133,8 @@ class SUPIR_Upscale:
             config = OmegaConf.load(config_path)
             config.model.params.ae_dtype = vae_dtype
             config.model.params.diffusion_dtype = model_dtype
+            config.model.params.conditioner_config.params.emb_models[0].params.version = SDXL_CLIP1_PTH # "openai/clip-vit-large-patch14"
+            config.model.params.conditioner_config.params.emb_models[1].params.version = SDXL_CLIP2_CKPT_PTH # "laion2b_s39b_b160k"
             self.model = instantiate_from_config(config.model).cpu()
             supir_state_dict = load_state_dict(SUPIR_MODEL_PATH)
             sdxl_state_dict = load_state_dict(SDXL_MODEL_PATH)
