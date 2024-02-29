@@ -366,7 +366,8 @@ class DPMPP2MSampler(BaseDiffusionSampler):
 
         return x
 
-
+import comfy.utils
+        
 class RestoreEDMSampler(SingleStepDiffusionSampler):
     def __init__(
         self, s_churn=0.0, s_tmin=0.0, s_tmax=float("inf"), s_noise=1.0, restore_cfg=4.0,
@@ -417,7 +418,7 @@ class RestoreEDMSampler(SingleStepDiffusionSampler):
         x, s_in, sigmas, num_sigmas, cond, uc = self.prepare_sampling_loop(
             x, cond, uc, num_steps
         )
-
+        pbar_comfy = comfy.utils.ProgressBar(num_sigmas)
         for _idx, i in enumerate(self.get_sigma_gen(num_sigmas)):
             gamma = (
                 min(self.s_churn / (num_sigmas - 1), 2**0.5 - 1)
@@ -437,6 +438,7 @@ class RestoreEDMSampler(SingleStepDiffusionSampler):
                 use_linear_control_scale=use_linear_control_scale,
                 control_scale_start=control_scale_start,
             )
+            pbar_comfy.update(1)
         return x
 
 def to_d_center(denoised, x_center, x):

@@ -41,6 +41,9 @@ class SUPIR_Upscale:
                "default": 'Wavelet'
             }),
             "keep_model_loaded": ("BOOLEAN", {"default": True}),
+            "use_tiled_vae": ("BOOLEAN", {"default": True}),
+            "encoder_tile_size_pixels": ("INT", {"default": 512, "min": 64, "max": 8192, "step": 64}),
+            "decoder_tile_size_latent": ("INT", {"default": 64, "min": 64, "max": 8192, "step": 64}),
             },
             "optional": {
                 "captions": ("STRING", {"forceInput": True, "multiline": False, "default": "",}),
@@ -55,9 +58,9 @@ class SUPIR_Upscale:
 
     CATEGORY = "SUPIR"
 
-    def process(self, steps, image, color_fix_type, seed, scale_by, cfg_scale, resize_method, s_churn, s_noise, 
-                control_scale, cfg_scale_start, control_scale_start, restoration_scale, keep_model_loaded,
-                a_prompt, n_prompt, sdxl_model, supir_model, captions=""):
+    def process(self, steps, image, color_fix_type, seed, scale_by, cfg_scale, resize_method, s_churn, s_noise, encoder_tile_size_pixels, decoder_tile_size_latent,
+                control_scale, cfg_scale_start, control_scale_start, restoration_scale, keep_model_loaded, 
+                a_prompt, n_prompt, sdxl_model, supir_model, use_tiled_vae, captions=""):
         
         
         device = comfy.model_management.get_torch_device()
@@ -77,6 +80,8 @@ class SUPIR_Upscale:
             self.model.load_state_dict(supir_state_dict, strict=False)
             self.model.load_state_dict(sdxl_state_dict, strict=False)
             self.model.to(device).to(dtype)
+            if use_tiled_vae:
+                self.model.init_tile_vae(encoder_tile_size=encoder_tile_size_pixels, decoder_tile_size=decoder_tile_size_latent)
    
         autocast_condition = dtype == torch.float16 or torch.bfloat16 and not comfy.model_management.is_device_mps(device)
         with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=dtype) if autocast_condition else nullcontext():
@@ -102,7 +107,6 @@ class SUPIR_Upscale:
             # save
             if not keep_model_loaded:
                 self.model = None
-            print(samples.shape)
             samples = samples.permute(0, 2, 3, 1).cpu()
             
             return(samples,)
