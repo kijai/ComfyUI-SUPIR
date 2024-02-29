@@ -8,5 +8,6 @@ open-clip-torch>=2.17.1
 opencv-python>=4.7.0.72
 pandas>=2.0.1
 Pillow>=9.4.0
-pytorch-lightning>=2.1.2
+pytorch-lightning==2.1.2
 PyYAML>=6.0
+omegaconf

@@ -130,6 +130,7 @@ class SUPIR_Upscale:
                                                 cfg_scale_start=cfg_scale_start, control_scale_start=control_scale_start)
                 
                 out.append(samples.squeeze(0).cpu())
+                print("Sampled image ", i, " out of ", B)
                 pbar.update(1)
             if not keep_model_loaded:
                     self.model = None
