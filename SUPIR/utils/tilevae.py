@@ -893,7 +893,7 @@ class VAEHook:
         # Task queue execution
         pbar = tqdm(total=num_tiles * len(task_queues[0]), desc=f"[Tiled VAE]: Executing {'Decoder' if is_decoder else 'Encoder'} Task Queue: ")
         import comfy.utils
-        pbar_comfy = comfy.utils.ProgressBar(num_tiles)
+        pbar_comfy = comfy.utils.ProgressBar(num_tiles * len(task_queues[0]))
 
         # execute the task back and forth when switch tiles so that we always
         # keep one tile on the GPU to reduce unnecessary data transfer
