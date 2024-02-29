@@ -152,19 +152,31 @@ class SUPIRModel(DiffusionEngine):
             samples = adaptive_instance_normalization(samples, x_stage1)
         return samples
 
-    def init_tile_vae(self, encoder_tile_size=512, decoder_tile_size=64):
-        self.first_stage_model.denoise_encoder.original_forward = self.first_stage_model.denoise_encoder.forward
-        self.first_stage_model.encoder.original_forward = self.first_stage_model.encoder.forward
-        self.first_stage_model.decoder.original_forward = self.first_stage_model.decoder.forward
-        self.first_stage_model.denoise_encoder.forward = VAEHook(
-            self.first_stage_model.denoise_encoder, encoder_tile_size, is_decoder=False, fast_decoder=False,
-            fast_encoder=False, color_fix=False, to_gpu=True)
-        self.first_stage_model.encoder.forward = VAEHook(
-            self.first_stage_model.encoder, encoder_tile_size, is_decoder=False, fast_decoder=False,
-            fast_encoder=False, color_fix=False, to_gpu=True)
-        self.first_stage_model.decoder.forward = VAEHook(
-            self.first_stage_model.decoder, decoder_tile_size, is_decoder=True, fast_decoder=False,
-            fast_encoder=False, color_fix=False, to_gpu=True)
+    def init_tile_vae(self, encoder_tile_size=512, decoder_tile_size=64, reset=False):
+        if reset:
+            # Reset the models to their original forward methods
+            if hasattr(self.first_stage_model.denoise_encoder, 'original_forward'):
+                self.first_stage_model.denoise_encoder.forward = self.first_stage_model.denoise_encoder.original_forward
+            if hasattr(self.first_stage_model.encoder, 'original_forward'):
+                self.first_stage_model.encoder.forward = self.first_stage_model.encoder.original_forward
+            if hasattr(self.first_stage_model.decoder, 'original_forward'):
+                self.first_stage_model.decoder.forward = self.first_stage_model.decoder.original_forward
+        else:
+            # Save the original forward methods
+            self.first_stage_model.denoise_encoder.original_forward = self.first_stage_model.denoise_encoder.forward
+            self.first_stage_model.encoder.original_forward = self.first_stage_model.encoder.forward
+            self.first_stage_model.decoder.original_forward = self.first_stage_model.decoder.forward
+
+            # Apply the VAEHook to the models
+            self.first_stage_model.denoise_encoder.forward = VAEHook(
+                self.first_stage_model.denoise_encoder, encoder_tile_size, is_decoder=False, fast_decoder=False,
+                fast_encoder=False, color_fix=False, to_gpu=True)
+            self.first_stage_model.encoder.forward = VAEHook(
+                self.first_stage_model.encoder, encoder_tile_size, is_decoder=False, fast_decoder=False,
+                fast_encoder=False, color_fix=False, to_gpu=True)
+            self.first_stage_model.decoder.forward = VAEHook(
+                self.first_stage_model.decoder, decoder_tile_size, is_decoder=True, fast_decoder=False,
+                fast_encoder=False, color_fix=False, to_gpu=True)
 
 
 if __name__ == '__main__':

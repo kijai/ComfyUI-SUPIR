@@ -65,7 +65,8 @@ class SUPIR_Upscale:
         
         device = comfy.model_management.get_torch_device()
         image = image.to(device)
-        batch_size = image.shape[0]
+        self.current_sdxl_model = None
+
         SUPIR_MODEL_PATH = folder_paths.get_full_path("checkpoints", supir_model)
         SDXL_MODEL_PATH = folder_paths.get_full_path("checkpoints", sdxl_model)
         
@@ -87,8 +88,8 @@ class SUPIR_Upscale:
             vae_dtype = 'fp32'
             model_dtype = 'fp32'
 
-        if not hasattr(self, "model") or self.model is None:
-            
+        if not hasattr(self, "model") or self.model is None or self.current_sdxl_model != sdxl_model:
+            self.current_sdxl_model = sdxl_model
             config = OmegaConf.load(config_path)
             config.model.params.ae_dtype = vae_dtype
             config.model.params.diffusion_dtype = model_dtype
@@ -101,7 +102,9 @@ class SUPIR_Upscale:
             self.model.load_state_dict(sdxl_state_dict, strict=False)
             self.model.to(device).to(dtype)
             if use_tiled_vae:
-                self.model.init_tile_vae(encoder_tile_size=encoder_tile_size_pixels, decoder_tile_size=decoder_tile_size_latent)
+                self.model.init_tile_vae(encoder_tile_size=encoder_tile_size_pixels, decoder_tile_size=decoder_tile_size_latent, reset=False)
+            else:
+                self.model.init_tile_vae(encoder_tile_size=encoder_tile_size_pixels, decoder_tile_size=decoder_tile_size_latent, reset=True)
    
         autocast_condition = dtype == torch.float16 or torch.bfloat16 and not comfy.model_management.is_device_mps(device)
         with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=dtype) if autocast_condition else nullcontext():
