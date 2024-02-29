@@ -66,7 +66,7 @@ import torch
 import torch.version
 import torch.nn.functional as F
 from einops import rearrange
-from diffusers.utils.import_utils import is_xformers_available
+#from diffusers.utils.import_utils import is_xformers_available
 
 #import SUPIR.utils.devices as devices
 
@@ -76,8 +76,10 @@ device = comfy.model_management.get_torch_device()
 try:
     import xformers
     import xformers.ops
-except ImportError:
-    pass
+    XFORMERS_IS_AVAILABLE = True
+except:
+    XFORMERS_IS_AVAILABLE = False
+    print("no module 'xformers'. Processing without...")
 
 sd_flag = True
 
@@ -364,7 +366,7 @@ def attn2task(task_queue, net):
     else:
         task_queue.append(('store_res', lambda x: x))
         task_queue.append(('pre_norm', net.norm))
-        if is_xformers_available:
+        if XFORMERS_IS_AVAILABLE:
             # task_queue.append(('attn', lambda x, net=net: attn_forward_new_xformers(net, x)))
             task_queue.append(
                 ('attn', lambda x, net=net: xformer_attn_forward(net, x)))
