@@ -141,6 +141,8 @@ class SUPIR_Upscale:
             if use_tiled_vae:
                 self.tiled_vae_state = True
                 self.model.init_tile_vae(encoder_tile_size=encoder_tile_size_pixels, decoder_tile_size=decoder_tile_size_latent)
+            else:
+                self.tiled_vae_state = False
        
    
         autocast_condition = dtype == torch.float16 or torch.bfloat16 and not comfy.model_management.is_device_mps(device)
