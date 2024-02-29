@@ -110,7 +110,7 @@ class SUPIR_Upscale:
         else:
             print(f"Diffusion using using {diffusion_dtype}")
             dtype = convert_dtype(diffusion_dtype)
-            model_dtype = convert_dtype(diffusion_dtype)
+            model_dtype = diffusion_dtype
 
         if encoder_dtype == 'auto':
             if comfy.model_management.should_use_bf16():
