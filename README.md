@@ -2,6 +2,17 @@
 
 ## WORK IN PROGRESS
 
+# Installing
+Either manager and install from git, or clone this repo to custom_nodes and run:
+
+`pip install -r requirements.txt`
+
+or if you use portable (run this in ComfyUI_windows_portable -folder):
+
+`python_embeded\python.exe -m pip install -r ComfyUI\custom_nodes\ComfyUI-SUPIR\requirements.txt`
+
+Additionally xformers might be necessary.
+
 https://github.com/kijai/ComfyUI-SUPIR/assets/40791699/545ddce4-8324-45cb-a545-6d1f527d8750
 
 WARNING: currently downloads 10GB clip model as I didn't figure out a way to use existing ones yet
