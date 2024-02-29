@@ -14,7 +14,7 @@ or if you use portable (run this in ComfyUI_windows_portable -folder):
 
 Additionally `xformers` seems to currently be necessary, a safe way (often problem on Windows) to install/update it is with:
 
-`pip install -U xformers --no-dependencies`
+`pip install -U xformers --no-dependencies`  (for portable `python_embeded\python.exe -m pip install -U xformers --no-dependencies` )
 
 Get the SUPIR model(s) from the original links below, they are loaded from the normal `ComfyUI/models/checkpoints` -folder
 In addition you need an SDXL model, they are loaded from the same folder.
