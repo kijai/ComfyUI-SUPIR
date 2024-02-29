@@ -6,10 +6,11 @@ from ...sgm.modules.distributions.distributions import DiagonalGaussianDistribut
 import random
 from ...SUPIR.utils.colorfix import wavelet_reconstruction, adaptive_instance_normalization
 from pytorch_lightning import seed_everything
-from torch.nn.functional import interpolate
 from ...SUPIR.utils.tilevae import VAEHook
-import importlib
-import os
+from contextlib import nullcontext
+import comfy.model_management
+
+device = comfy.model_management.get_torch_device()
 
 class SUPIRModel(DiffusionEngine):
     def __init__(self, control_stage_config, ae_dtype='fp32', diffusion_dtype='fp32', p_p='', n_p='', *args, **kwargs):
@@ -42,14 +43,18 @@ class SUPIRModel(DiffusionEngine):
 
     @torch.no_grad()
     def encode_first_stage(self, x):
-        with torch.autocast("cuda", dtype=self.ae_dtype):
+        #with torch.autocast(device, dtype=self.ae_dtype):
+        autocast_condition = (self.ae_dtype == torch.float16 or self.ae_dtype == torch.bfloat16) and not comfy.model_management.is_device_mps(device)
+        with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=self.ae_dtype) if autocast_condition else nullcontext():
             z = self.first_stage_model.encode(x)
         z = self.scale_factor * z
         return z
 
     @torch.no_grad()
     def encode_first_stage_with_denoise(self, x, use_sample=True, is_stage1=False):
-        with torch.autocast("cuda", dtype=self.ae_dtype):
+        #with torch.autocast(device, dtype=self.ae_dtype):
+        autocast_condition = (self.ae_dtype == torch.float16 or self.ae_dtype == torch.bfloat16) and not comfy.model_management.is_device_mps(device)
+        with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=self.ae_dtype) if autocast_condition else nullcontext():
             if is_stage1:
                 h = self.first_stage_model.denoise_encoder_s1(x)
             else:
@@ -66,7 +71,9 @@ class SUPIRModel(DiffusionEngine):
     @torch.no_grad()
     def decode_first_stage(self, z):
         z = 1.0 / self.scale_factor * z
-        with torch.autocast("cuda", dtype=self.ae_dtype):
+        #with torch.autocast(device, dtype=self.ae_dtype):
+        autocast_condition = (self.ae_dtype == torch.float16 or self.ae_dtype == torch.bfloat16) and not comfy.model_management.is_device_mps(device)
+        with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=self.ae_dtype) if autocast_condition else nullcontext():
             out = self.first_stage_model.decode(z)
         return out.float()
 
@@ -134,7 +141,9 @@ class SUPIRModel(DiffusionEngine):
         batch_uc = copy.deepcopy(batch)
         batch_uc['txt'] = [n_p for _ in p]
 
-        with torch.cuda.amp.autocast(dtype=self.ae_dtype):
+        #with torch.cuda.amp.autocast(dtype=self.ae_dtype):
+        autocast_condition = (self.model.dtype == torch.float16 or self.model.dtype == torch.bfloat16) and not comfy.model_management.is_device_mps(device)
+        with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=self.model.dtype) if autocast_condition else nullcontext():
             c, uc = self.conditioner.get_unconditional_conditioning(batch, batch_uc)
 
         denoiser = lambda input, sigma, c, control_scale: self.denoiser(
@@ -167,17 +176,17 @@ class SUPIRModel(DiffusionEngine):
             fast_encoder=False, color_fix=False, to_gpu=True)
 
 
-if __name__ == '__main__':
-    from SUPIR.util import create_model, load_state_dict
+# if __name__ == '__main__':
+#     from SUPIR.util import create_model, load_state_dict
 
-    model = create_model('../../options/dev/SUPIR_paper_version.yaml')
+#     model = create_model('../../options/dev/SUPIR_paper_version.yaml')
 
-    SDXL_CKPT = '/opt/data/private/AIGC_pretrain/SDXL_cache/sd_xl_base_1.0_0.9vae.safetensors'
-    SUPIR_CKPT = '/opt/data/private/AIGC_pretrain/SUPIR_cache/SUPIR-paper.ckpt'
-    model.load_state_dict(load_state_dict(SDXL_CKPT), strict=False)
-    model.load_state_dict(load_state_dict(SUPIR_CKPT), strict=False)
-    model = model.cuda()
+#     SDXL_CKPT = '/opt/data/private/AIGC_pretrain/SDXL_cache/sd_xl_base_1.0_0.9vae.safetensors'
+#     SUPIR_CKPT = '/opt/data/private/AIGC_pretrain/SUPIR_cache/SUPIR-paper.ckpt'
+#     model.load_state_dict(load_state_dict(SDXL_CKPT), strict=False)
+#     model.load_state_dict(load_state_dict(SUPIR_CKPT), strict=False)
+#     model = model.cuda()
 
-    x = torch.randn(1, 3, 512, 512).cuda()
-    p = ['a professional, detailed, high-quality photo']
-    samples = model.batchify_sample(x, p, num_steps=50, restoration_scale=4.0, s_churn=0, cfg_scale=4.0, seed=-1, num_samples=1)
+#     x = torch.randn(1, 3, 512, 512).cuda()
+#     p = ['a professional, detailed, high-quality photo']
+#     samples = model.batchify_sample(x, p, num_steps=50, restoration_scale=4.0, s_churn=0, cfg_scale=4.0, seed=-1, num_samples=1)

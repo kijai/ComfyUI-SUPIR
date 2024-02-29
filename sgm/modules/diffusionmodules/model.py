@@ -23,6 +23,10 @@ class Conv2d(torch.nn.Conv2d):
     def reset_parameters(self):
         return None
     
+class Linear(torch.nn.Linear):
+    def reset_parameters(self):
+        return None
+    
 def get_timestep_embedding(timesteps, embedding_dim):
     """
     This matches the implementation in Denoising Diffusion Probabilistic Models:
@@ -112,7 +116,7 @@ class ResnetBlock(nn.Module):
             in_channels, out_channels, kernel_size=3, stride=1, padding=1
         )
         if temb_channels > 0:
-            self.temb_proj = torch.nn.Linear(temb_channels, out_channels)
+            self.temb_proj = Linear(temb_channels, out_channels)
         self.norm2 = Normalize(out_channels)
         self.dropout = torch.nn.Dropout(dropout)
         self.conv2 = Conv2d(
@@ -340,8 +344,8 @@ class Model(nn.Module):
             self.temb = nn.Module()
             self.temb.dense = nn.ModuleList(
                 [
-                    torch.nn.Linear(self.ch, self.temb_ch),
-                    torch.nn.Linear(self.temb_ch, self.temb_ch),
+                    Linear(self.ch, self.temb_ch),
+                    Linear(self.temb_ch, self.temb_ch),
                 ]
             )
 

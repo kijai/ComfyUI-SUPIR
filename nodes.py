@@ -44,7 +44,7 @@ class SUPIR_Upscale:
                 'AdaIn',
                 'Wavelet',
             ], {
-               "default": 'AdaIn'
+               "default": 'None'
             }),
             "keep_model_loaded": ("BOOLEAN", {"default": True}),
             "use_tiled_vae": ("BOOLEAN", {"default": True}),
@@ -64,16 +64,13 @@ class SUPIR_Upscale:
                 }),
                 "encoder_dtype": (
                 [   
-                    'fp16',
                     'bf16',
                     'fp32',
                     'auto'
                 ], {
                 "default": 'auto'
                 }),
-            }
-            
-            
+                    } 
             }
     
     RETURN_TYPES = ("IMAGE",)
@@ -145,8 +142,8 @@ class SUPIR_Upscale:
                 self.tiled_vae_state = False
        
    
-        autocast_condition = dtype == torch.float16 or torch.bfloat16 and not comfy.model_management.is_device_mps(device)
-        with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=dtype) if autocast_condition else nullcontext():
+        #autocast_condition = (dtype == torch.float16 or dtype == torch.bfloat16) and not comfy.model_management.is_device_mps(device)
+        #with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=dtype) if autocast_condition else nullcontext():
             
             image, = ImageScaleBy.upscale(self, image, resize_method, scale_by)
             B, H, W, C = image.shape
@@ -165,7 +162,7 @@ class SUPIR_Upscale:
             pbar = comfy.utils.ProgressBar(B)
             for i in range(B):
                 # # step 3: Diffusion Process
-                samples = self.model.batchify_sample(resized_image[i].unsqueeze(0), captions_list, num_steps=steps, restoration_scale= restoration_scale, s_churn=s_churn,
+                samples = self.model.batchify_sample(resized_image[i].unsqueeze(0), captions_list, num_steps=steps, restoration_scale=restoration_scale, s_churn=s_churn,
                                                 s_noise=s_noise, cfg_scale=cfg_scale, control_scale=control_scale, seed=seed,
                                                 num_samples=1, p_p=a_prompt, n_p=n_prompt, color_fix_type=color_fix_type,
                                                 use_linear_CFG=use_linear_CFG, use_linear_control_scale=use_linear_control_scale,
