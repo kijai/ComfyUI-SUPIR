@@ -69,10 +69,28 @@ class SUPIR_Upscale:
         SDXL_MODEL_PATH = folder_paths.get_full_path("checkpoints", sdxl_model)
         
         config_path = os.path.join(script_directory, "options/SUPIR_v0.yaml")
-        dtype = torch.float16 if comfy.model_management.should_use_fp16() and not comfy.model_management.is_device_mps(device) else torch.float32
+
+        if comfy.model_management.should_use_bf16():
+            print("Using bf16")
+            dtype = torch.bfloat16
+            vae_dtype = 'bf16'
+            model_dtype = 'bf16'
+        elif comfy.model_management.should_use_fp16():
+            print("Using fp16")
+            dtype = torch.float16
+            vae_dtype = 'fp32'
+            model_dtype = 'fp16'
+        else:
+            print("Using fp32")
+            dtype = torch.float32
+            vae_dtype = 'fp32'
+            model_dtype = 'fp32'
+
         if not hasattr(self, "model") or self.model is None:
             
             config = OmegaConf.load(config_path)
+            config.model.params.ae_dtype = vae_dtype
+            config.model.params.diffusion_dtype = model_dtype
             self.model = instantiate_from_config(config.model).cpu()
             from .SUPIR.util import load_state_dict
             supir_state_dict = load_state_dict(SUPIR_MODEL_PATH)
