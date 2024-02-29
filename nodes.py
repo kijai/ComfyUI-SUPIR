@@ -91,8 +91,7 @@ class SUPIR_Upscale:
         
         SUPIR_MODEL_PATH = folder_paths.get_full_path("checkpoints", supir_model)
         SDXL_MODEL_PATH = folder_paths.get_full_path("checkpoints", sdxl_model)
-        SDXL_CLIP1_PTH = folder_paths.get_full_path("clip_vision", sdxl_clip1)
-        SDXL_CLIP1_PTH = SDXL_CLIP1_PTH[:SDXL_CLIP1_PTH.rfind(os.path.sep) + 1]
+        SDXL_CLIP1_PTH = os.path.split(folder_paths.get_full_path("clip_vision", sdxl_clip1))[0]
         SDXL_CLIP2_CKPT_PTH = folder_paths.get_full_path("clip_vision", sdxl_clip2)
         
         config_path = os.path.join(script_directory, "options/SUPIR_v0.yaml")
