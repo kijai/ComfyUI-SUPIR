@@ -2,6 +2,9 @@
 
 ## WORK IN PROGRESS
 
+![image](https://github.com/kijai/ComfyUI-SUPIR/assets/40791699/fea6024e-a82b-4cc8-921d-0ff042851958)
+
+https://github.com/kijai/ComfyUI-SUPIR/assets/40791699/545ddce4-8324-45cb-a545-6d1f527d8750
 
 WARNING: currently downloads 10GB clip model as I didn't figure out a way to use existing ones yet
 
