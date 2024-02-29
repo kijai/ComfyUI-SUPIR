@@ -11,11 +11,22 @@ or if you use portable (run this in ComfyUI_windows_portable -folder):
 
 `python_embeded\python.exe -m pip install -r ComfyUI\custom_nodes\ComfyUI-SUPIR\requirements.txt`
 
+Video upscale test (currently the node does frames one by one from input batch):
+https://github.com/kijai/ComfyUI-SUPIR/assets/40791699/33621520-a429-4155-aa3a-ac5cd15bda56
+https://github.com/kijai/ComfyUI-SUPIR/assets/40791699/d6c60e0a-11c3-496d-82c6-a724758a131a
+
+
+
+
+
+
 Additionally xformers might be necessary.
+WARNING: currently downloads 10GB clip model as I didn't figure out a way to use existing ones yet
+
 
 https://github.com/kijai/ComfyUI-SUPIR/assets/40791699/545ddce4-8324-45cb-a545-6d1f527d8750
 
-WARNING: currently downloads 10GB clip model as I didn't figure out a way to use existing ones yet
+
 
 -------------------------------------------
 
