@@ -19,7 +19,10 @@ except:
 
 from ...modules.attention import LinearAttention, MemoryEfficientCrossAttention
 
-
+class Conv2d(torch.nn.Conv2d):
+    def reset_parameters(self):
+        return None
+    
 def get_timestep_embedding(timesteps, embedding_dim):
     """
     This matches the implementation in Denoising Diffusion Probabilistic Models:
@@ -57,7 +60,7 @@ class Upsample(nn.Module):
         super().__init__()
         self.with_conv = with_conv
         if self.with_conv:
-            self.conv = torch.nn.Conv2d(
+            self.conv = Conv2d(
                 in_channels, in_channels, kernel_size=3, stride=1, padding=1
             )
 
@@ -74,7 +77,7 @@ class Downsample(nn.Module):
         self.with_conv = with_conv
         if self.with_conv:
             # no asymmetric padding in torch conv, must do it ourselves
-            self.conv = torch.nn.Conv2d(
+            self.conv = Conv2d(
                 in_channels, in_channels, kernel_size=3, stride=2, padding=0
             )
 
@@ -105,23 +108,23 @@ class ResnetBlock(nn.Module):
         self.use_conv_shortcut = conv_shortcut
 
         self.norm1 = Normalize(in_channels)
-        self.conv1 = torch.nn.Conv2d(
+        self.conv1 = Conv2d(
             in_channels, out_channels, kernel_size=3, stride=1, padding=1
         )
         if temb_channels > 0:
             self.temb_proj = torch.nn.Linear(temb_channels, out_channels)
         self.norm2 = Normalize(out_channels)
         self.dropout = torch.nn.Dropout(dropout)
-        self.conv2 = torch.nn.Conv2d(
+        self.conv2 = Conv2d(
             out_channels, out_channels, kernel_size=3, stride=1, padding=1
         )
         if self.in_channels != self.out_channels:
             if self.use_conv_shortcut:
-                self.conv_shortcut = torch.nn.Conv2d(
+                self.conv_shortcut = Conv2d(
                     in_channels, out_channels, kernel_size=3, stride=1, padding=1
                 )
             else:
-                self.nin_shortcut = torch.nn.Conv2d(
+                self.nin_shortcut = Conv2d(
                     in_channels, out_channels, kernel_size=1, stride=1, padding=0
                 )
 
@@ -161,16 +164,16 @@ class AttnBlock(nn.Module):
         self.in_channels = in_channels
 
         self.norm = Normalize(in_channels)
-        self.q = torch.nn.Conv2d(
+        self.q = Conv2d(
             in_channels, in_channels, kernel_size=1, stride=1, padding=0
         )
-        self.k = torch.nn.Conv2d(
+        self.k = Conv2d(
             in_channels, in_channels, kernel_size=1, stride=1, padding=0
         )
-        self.v = torch.nn.Conv2d(
+        self.v = Conv2d(
             in_channels, in_channels, kernel_size=1, stride=1, padding=0
         )
-        self.proj_out = torch.nn.Conv2d(
+        self.proj_out = Conv2d(
             in_channels, in_channels, kernel_size=1, stride=1, padding=0
         )
 
@@ -211,16 +214,16 @@ class MemoryEfficientAttnBlock(nn.Module):
         self.in_channels = in_channels
 
         self.norm = Normalize(in_channels)
-        self.q = torch.nn.Conv2d(
+        self.q = Conv2d(
             in_channels, in_channels, kernel_size=1, stride=1, padding=0
         )
-        self.k = torch.nn.Conv2d(
+        self.k = Conv2d(
             in_channels, in_channels, kernel_size=1, stride=1, padding=0
         )
-        self.v = torch.nn.Conv2d(
+        self.v = Conv2d(
             in_channels, in_channels, kernel_size=1, stride=1, padding=0
         )
-        self.proj_out = torch.nn.Conv2d(
+        self.proj_out = Conv2d(
             in_channels, in_channels, kernel_size=1, stride=1, padding=0
         )
         self.attention_op: Optional[Any] = None
@@ -343,7 +346,7 @@ class Model(nn.Module):
             )
 
         # downsampling
-        self.conv_in = torch.nn.Conv2d(
+        self.conv_in = Conv2d(
             in_channels, self.ch, kernel_size=3, stride=1, padding=1
         )
 
@@ -422,7 +425,7 @@ class Model(nn.Module):
 
         # end
         self.norm_out = Normalize(block_in)
-        self.conv_out = torch.nn.Conv2d(
+        self.conv_out = Conv2d(
             block_in, out_ch, kernel_size=3, stride=1, padding=1
         )
 
@@ -509,7 +512,7 @@ class Encoder(nn.Module):
         self.in_channels = in_channels
 
         # downsampling
-        self.conv_in = torch.nn.Conv2d(
+        self.conv_in = Conv2d(
             in_channels, self.ch, kernel_size=3, stride=1, padding=1
         )
 
@@ -560,7 +563,7 @@ class Encoder(nn.Module):
 
         # end
         self.norm_out = Normalize(block_in)
-        self.conv_out = torch.nn.Conv2d(
+        self.conv_out = Conv2d(
             block_in,
             2 * z_channels if double_z else z_channels,
             kernel_size=3,
@@ -643,7 +646,7 @@ class Decoder(nn.Module):
         make_resblock_cls = self._make_resblock()
         make_conv_cls = self._make_conv()
         # z to block_in
-        self.conv_in = torch.nn.Conv2d(
+        self.conv_in = Conv2d(
             z_channels, block_in, kernel_size=3, stride=1, padding=1
         )
 
@@ -702,7 +705,7 @@ class Decoder(nn.Module):
         return ResnetBlock
 
     def _make_conv(self) -> Callable:
-        return torch.nn.Conv2d
+        return Conv2d
 
     def get_last_layer(self, **kwargs):
         return self.conv_out.weight

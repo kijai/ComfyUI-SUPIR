@@ -121,7 +121,13 @@ def test_for_nans(x, where):
 
     raise NansException(message)
 
-
+class Conv2d(torch.nn.Conv2d):
+    def reset_parameters(self):
+        return None
+class Linear(torch.nn.Linear):
+    def reset_parameters(self):
+        return None
+    
 @lru_cache
 def first_time_calculation():
     """
@@ -130,9 +136,9 @@ def first_time_calculation():
     """
 
     x = torch.zeros((1, 1)).to(device, dtype)
-    linear = torch.nn.Linear(1, 1).to(device, dtype)
+    linear = Linear(1, 1).to(device, dtype)
     linear(x)
 
     x = torch.zeros((1, 1, 3, 3)).to(device, dtype)
-    conv2d = torch.nn.Conv2d(1, 1, (3, 3)).to(device, dtype)
+    conv2d = Conv2d(1, 1, (3, 3)).to(device, dtype)
     conv2d(x)

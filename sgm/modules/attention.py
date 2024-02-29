@@ -10,6 +10,10 @@ from einops import rearrange, repeat
 from packaging import version
 from torch import nn
 
+class Conv2d(torch.nn.Conv2d):
+    def reset_parameters(self):
+        return None
+
 if version.parse(torch.__version__) >= version.parse("2.0.0"):
     SDP_IS_AVAILABLE = True
     from torch.backends.cuda import SDPBackend, sdp_kernel
@@ -154,16 +158,16 @@ class SpatialSelfAttention(nn.Module):
         self.in_channels = in_channels
 
         self.norm = Normalize(in_channels)
-        self.q = torch.nn.Conv2d(
+        self.q = Conv2d(
             in_channels, in_channels, kernel_size=1, stride=1, padding=0
         )
-        self.k = torch.nn.Conv2d(
+        self.k = Conv2d(
             in_channels, in_channels, kernel_size=1, stride=1, padding=0
         )
-        self.v = torch.nn.Conv2d(
+        self.v = Conv2d(
             in_channels, in_channels, kernel_size=1, stride=1, padding=0
         )
-        self.proj_out = torch.nn.Conv2d(
+        self.proj_out = Conv2d(
             in_channels, in_channels, kernel_size=1, stride=1, padding=0
         )
 

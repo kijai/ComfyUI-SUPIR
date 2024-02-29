@@ -17,6 +17,7 @@ class SUPIR_Upscale:
         self.current_sdxl_model = None
         self.current_diffusion_dtype = None
         self.current_encoder_dtype = None
+        self.tiled_vae_state = None
     upscale_methods = ["nearest-exact", "bilinear", "area", "bicubic", "lanczos"]
     @classmethod
     def INPUT_TYPES(s):
@@ -123,7 +124,7 @@ class SUPIR_Upscale:
             vae_dtype = encoder_dtype
             print(f"Encoder using using {vae_dtype}")
 
-        if not hasattr(self, "model") or self.model is None or self.current_sdxl_model != sdxl_model or self.current_diffusion_dtype != diffusion_dtype or self.current_encoder_dtype != encoder_dtype:
+        if not hasattr(self, "model") or self.model is None or self.current_sdxl_model != sdxl_model or self.current_diffusion_dtype != diffusion_dtype or self.current_encoder_dtype != encoder_dtype or self.tiled_vae_state != use_tiled_vae:
             self.current_diffusion_dtype = diffusion_dtype
             self.current_encoder_dtype = encoder_dtype
             self.current_sdxl_model = sdxl_model
@@ -137,10 +138,10 @@ class SUPIR_Upscale:
             self.model.load_state_dict(sdxl_state_dict, strict=False)
             self.model.to(device).to(dtype)
             
-        if use_tiled_vae:
-            self.model.init_tile_vae(encoder_tile_size=encoder_tile_size_pixels, decoder_tile_size=decoder_tile_size_latent, reset=False)
-        else:
-            self.model.init_tile_vae(encoder_tile_size=encoder_tile_size_pixels, decoder_tile_size=decoder_tile_size_latent, reset=True)
+            if use_tiled_vae:
+                self.tiled_vae_state = True
+                self.model.init_tile_vae(encoder_tile_size=encoder_tile_size_pixels, decoder_tile_size=decoder_tile_size_latent)
+       
    
         autocast_condition = dtype == torch.float16 or torch.bfloat16 and not comfy.model_management.is_device_mps(device)
         with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=dtype) if autocast_condition else nullcontext():
