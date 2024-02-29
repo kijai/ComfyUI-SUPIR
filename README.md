@@ -1,6 +1,7 @@
 # ComfyUI SUPIR upscaler wrapper node
 
 ## WORK IN PROGRESS
+![image](https://github.com/kijai/ComfyUI-SUPIR/assets/40791699/887898d3-afe5-45d1-be08-50f6620b70eb)
 
 # Installing
 Either manager and install from git, or clone this repo to custom_nodes and run:
