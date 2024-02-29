@@ -13,6 +13,9 @@ or if you use portable (run this in ComfyUI_windows_portable -folder):
 
 Additionally xformers might be necessary.
 
+Get the SUPIR model(s) from the original links below, they are loaded from the normal ComfyUI/models/checkpoints -folder
+In addition you need an SDXL model, they are loaded from the same folder.
+
 ## WARNING: currently downloads 10GB clip model as I didn't figure out a way to use existing ones yet
 
 # Tests
