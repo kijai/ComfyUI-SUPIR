@@ -12,7 +12,9 @@ from .sgm.util import instantiate_from_config
 script_directory = os.path.dirname(os.path.abspath(__file__))
 
 class SUPIR_Upscale:
-    upscale_methods = ["nearest-exact", "bilinear", "area", "bicubic", "lanczos"]
+    def __init__(self):
+        self.current_sdxl_model = None
+        self.upscale_methods = ["nearest-exact", "bilinear", "area", "bicubic", "lanczos"]
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {
@@ -65,8 +67,7 @@ class SUPIR_Upscale:
         
         device = comfy.model_management.get_torch_device()
         image = image.to(device)
-        self.current_sdxl_model = None
-
+        
         SUPIR_MODEL_PATH = folder_paths.get_full_path("checkpoints", supir_model)
         SDXL_MODEL_PATH = folder_paths.get_full_path("checkpoints", sdxl_model)
         
