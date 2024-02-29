@@ -9,6 +9,7 @@ import folder_paths
 from nodes import ImageScaleBy
 import torch.cuda
 from .sgm.util import instantiate_from_config
+from .SUPIR.util import convert_dtype, load_state_dict
 script_directory = os.path.dirname(os.path.abspath(__file__))
 
 class SUPIR_Upscale:
@@ -49,6 +50,24 @@ class SUPIR_Upscale:
             },
             "optional": {
                 "captions": ("STRING", {"forceInput": True, "multiline": False, "default": "",}),
+                "diffusion_dtype": (
+                [   
+                    'fp16',
+                    'bf16',
+                    'fp32',
+                    'auto'
+                ], {
+                "default": 'auto'
+                }),
+                "encoder_dtype": (
+                [   
+                    'fp16',
+                    'bf16',
+                    'fp32',
+                    'auto'
+                ], {
+                "default": 'auto'
+                }),
             }
             
             
@@ -62,7 +81,7 @@ class SUPIR_Upscale:
 
     def process(self, steps, image, color_fix_type, seed, scale_by, cfg_scale, resize_method, s_churn, s_noise, encoder_tile_size_pixels, decoder_tile_size_latent,
                 control_scale, cfg_scale_start, control_scale_start, restoration_scale, keep_model_loaded, 
-                a_prompt, n_prompt, sdxl_model, supir_model, use_tiled_vae, captions=""):
+                a_prompt, n_prompt, sdxl_model, supir_model, use_tiled_vae, captions="", diffusion_dtype="auto", encoder_dtype="auto"):
         
         
         device = comfy.model_management.get_torch_device()
@@ -73,21 +92,32 @@ class SUPIR_Upscale:
         
         config_path = os.path.join(script_directory, "options/SUPIR_v0.yaml")
 
-        if comfy.model_management.should_use_bf16():
-            print("Using bf16")
-            dtype = torch.bfloat16
-            vae_dtype = 'bf16'
-            model_dtype = 'bf16'
-        elif comfy.model_management.should_use_fp16():
-            print("Using fp16")
-            dtype = torch.float16
-            vae_dtype = 'fp32'
-            model_dtype = 'fp16'
+        if diffusion_dtype == 'auto':
+            if comfy.model_management.should_use_bf16():
+                print("Using bf16")
+                dtype = torch.bfloat16
+                model_dtype = 'bf16'
+            elif comfy.model_management.should_use_fp16():
+                print("Using fp16")
+                dtype = torch.float16
+                model_dtype = 'fp16'
+            else:
+                print("Using fp32")
+                dtype = torch.float32
+                model_dtype = 'fp32'
         else:
-            print("Using fp32")
-            dtype = torch.float32
-            vae_dtype = 'fp32'
-            model_dtype = 'fp32'
+            dtype = convert_dtype(diffusion_dtype)
+            model_dtype = convert_dtype(diffusion_dtype)
+
+        if encoder_dtype == 'auto':
+            if comfy.model_management.should_use_bf16():
+                print("Using bf16")
+                vae_dtype = 'bf16'
+            else:
+                print("Using fp32")
+                vae_dtype = 'fp32'
+        else:
+            vae_dtype = encoder_dtype
 
         if not hasattr(self, "model") or self.model is None or self.current_sdxl_model != sdxl_model:
             self.current_sdxl_model = sdxl_model
@@ -95,8 +125,6 @@ class SUPIR_Upscale:
             config.model.params.ae_dtype = vae_dtype
             config.model.params.diffusion_dtype = model_dtype
             self.model = instantiate_from_config(config.model).cpu()
-            print(type(self.model))
-            from .SUPIR.util import load_state_dict
             supir_state_dict = load_state_dict(SUPIR_MODEL_PATH)
             sdxl_state_dict = load_state_dict(SDXL_MODEL_PATH)
             self.model.load_state_dict(supir_state_dict, strict=False)
