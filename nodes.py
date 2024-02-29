@@ -145,32 +145,32 @@ class SUPIR_Upscale:
         #autocast_condition = (dtype == torch.float16 or dtype == torch.bfloat16) and not comfy.model_management.is_device_mps(device)
         #with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=dtype) if autocast_condition else nullcontext():
             
-            image, = ImageScaleBy.upscale(self, image, resize_method, scale_by)
-            B, H, W, C = image.shape
-            new_height = H // 64 * 64
-            new_width = W // 64 * 64
-            image = image.permute(0, 3, 1, 2).contiguous()
-            resized_image = F.interpolate(image, size=(new_height, new_width), mode='bicubic', align_corners=False)
-                
-            captions_list = []
-            captions_list.append(captions)
-            print(captions_list)
-                
-            use_linear_CFG = cfg_scale_start > 0
-            use_linear_control_scale = control_scale_start > 0
-            out = []
-            pbar = comfy.utils.ProgressBar(B)
-            for i in range(B):
-                # # step 3: Diffusion Process
-                samples = self.model.batchify_sample(resized_image[i].unsqueeze(0), captions_list, num_steps=steps, restoration_scale=restoration_scale, s_churn=s_churn,
-                                                s_noise=s_noise, cfg_scale=cfg_scale, control_scale=control_scale, seed=seed,
-                                                num_samples=1, p_p=a_prompt, n_p=n_prompt, color_fix_type=color_fix_type,
-                                                use_linear_CFG=use_linear_CFG, use_linear_control_scale=use_linear_control_scale,
-                                                cfg_scale_start=cfg_scale_start, control_scale_start=control_scale_start)
-                
-                out.append(samples.squeeze(0).cpu())
-                print("Sampled image ", i, " out of ", B)
-                pbar.update(1)
+        image, = ImageScaleBy.upscale(self, image, resize_method, scale_by)
+        B, H, W, C = image.shape
+        new_height = H // 64 * 64
+        new_width = W // 64 * 64
+        image = image.permute(0, 3, 1, 2).contiguous()
+        resized_image = F.interpolate(image, size=(new_height, new_width), mode='bicubic', align_corners=False)
+            
+        captions_list = []
+        captions_list.append(captions)
+        print(captions_list)
+            
+        use_linear_CFG = cfg_scale_start > 0
+        use_linear_control_scale = control_scale_start > 0
+        out = []
+        pbar = comfy.utils.ProgressBar(B)
+        for i in range(B):
+            # # step 3: Diffusion Process
+            samples = self.model.batchify_sample(resized_image[i].unsqueeze(0), captions_list, num_steps=steps, restoration_scale=restoration_scale, s_churn=s_churn,
+                                            s_noise=s_noise, cfg_scale=cfg_scale, control_scale=control_scale, seed=seed,
+                                            num_samples=1, p_p=a_prompt, n_p=n_prompt, color_fix_type=color_fix_type,
+                                            use_linear_CFG=use_linear_CFG, use_linear_control_scale=use_linear_control_scale,
+                                            cfg_scale_start=cfg_scale_start, control_scale_start=control_scale_start)
+            
+            out.append(samples.squeeze(0).cpu())
+            print("Sampled image ", i, " out of ", B)
+            pbar.update(1)
             if not keep_model_loaded:
                     self.model = None
             out_stacked = torch.stack(out, dim=0).cpu().to(torch.float32).permute(0, 2, 3, 1)
