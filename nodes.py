@@ -14,7 +14,7 @@ script_directory = os.path.dirname(os.path.abspath(__file__))
 class SUPIR_Upscale:
     def __init__(self):
         self.current_sdxl_model = None
-        self.upscale_methods = ["nearest-exact", "bilinear", "area", "bicubic", "lanczos"]
+    upscale_methods = ["nearest-exact", "bilinear", "area", "bicubic", "lanczos"]
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {
