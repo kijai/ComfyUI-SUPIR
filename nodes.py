@@ -224,15 +224,8 @@ class SUPIR_Upscale:
                 mm.free_memory(mm.get_total_memory(mm.get_torch_device()), mm.get_torch_device())
                 self.model = None
                 mm.soft_empty_cache()
-                print("its likely that too large of a batch size for SUPIR was used,"
-                      " and it has devoured all of the memory it had reserved, you will need to restart comfyui")
-                raise e
-            except Exception as e:
-                self.model = None
-                mm.soft_empty_cache()
-                mm.free_memory(mm.get_total_memory(mm.get_torch_device()), mm.get_torch_device())
-                print("its likely that too large of a batch size for SUPIR was used,"
-                      " and it has devoured all of the memory it had reserved, you will need to restart comfyui")
+                print("It's likely that too large of an image or batch_size for SUPIR was used,"
+                      " and it has devoured all of the memory it had reserved, you may need to restart ComfyUI")
                 raise e
 
             out.append(samples.squeeze(0).cpu())
