@@ -34,6 +34,10 @@ from ...util import (
 
 from ....CKPT_PTH import SDXL_CLIP1_PATH, SDXL_CLIP2_CKPT_PTH
 
+class Conv2d(torch.nn.Conv2d):
+    def reset_parameters(self):
+        return None
+
 class AbstractEmbModel(nn.Module):
     def __init__(self):
         super().__init__()
@@ -900,7 +904,7 @@ class SpatialRescaler(nn.Module):
             print(
                 f"Spatial Rescaler mapping from {in_channels} to {out_channels} channels after resizing."
             )
-            self.channel_mapper = nn.Conv2d(
+            self.channel_mapper = Conv2d(
                 in_channels,
                 out_channels,
                 kernel_size=kernel_size,

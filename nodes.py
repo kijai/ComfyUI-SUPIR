@@ -15,6 +15,7 @@ script_directory = os.path.dirname(os.path.abspath(__file__))
 class SUPIR_Upscale:
     def __init__(self):
         self.current_sdxl_model = None
+        self.current_supir_model = None
         self.current_diffusion_dtype = None
         self.current_encoder_dtype = None
         self.tiled_vae_state = None
@@ -128,11 +129,13 @@ class SUPIR_Upscale:
             vae_dtype = encoder_dtype
             print(f"Encoder using using {vae_dtype}")
 
-        if not hasattr(self, "model") or self.model is None or self.current_sdxl_model != sdxl_model or self.current_diffusion_dtype != diffusion_dtype or self.current_encoder_dtype != encoder_dtype or self.tiled_vae_state != use_tiled_vae:
+        if not hasattr(self, "model") or self.model is None or self.current_sdxl_model != sdxl_model or self.current_diffusion_dtype != diffusion_dtype or self.current_encoder_dtype != encoder_dtype or self.tiled_vae_state != use_tiled_vae or self.current_supir_model != supir_model:
             self.model = None
+            comfy.model_management.soft_empty_cache()
             self.current_diffusion_dtype = diffusion_dtype
             self.current_encoder_dtype = encoder_dtype
             self.current_sdxl_model = sdxl_model
+            self.current_supir_model = supir_model
             config = OmegaConf.load(config_path)
             config.model.params.ae_dtype = vae_dtype
             config.model.params.diffusion_dtype = model_dtype
@@ -188,6 +191,7 @@ class SUPIR_Upscale:
             pbar.update(1)
         if not keep_model_loaded:
                 self.model = None
+                comfy.model_management.soft_empty_cache()
         out_stacked = torch.stack(out, dim=0).cpu().to(torch.float32).permute(0, 2, 3, 1)
         return(out_stacked,)
     

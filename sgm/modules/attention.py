@@ -13,7 +13,11 @@ from torch import nn
 class Conv2d(torch.nn.Conv2d):
     def reset_parameters(self):
         return None
-
+    
+class Linear(torch.nn.Linear):
+    def reset_parameters(self):
+        return None
+    
 if version.parse(torch.__version__) >= version.parse("2.0.0"):
     SDP_IS_AVAILABLE = True
     from torch.backends.cuda import SDPBackend, sdp_kernel
@@ -88,7 +92,7 @@ def init_(tensor):
 class GEGLU(nn.Module):
     def __init__(self, dim_in, dim_out):
         super().__init__()
-        self.proj = nn.Linear(dim_in, dim_out * 2)
+        self.proj = Linear(dim_in, dim_out * 2)
 
     def forward(self, x):
         x, gate = self.proj(x).chunk(2, dim=-1)
@@ -101,13 +105,13 @@ class FeedForward(nn.Module):
         inner_dim = int(dim * mult)
         dim_out = default(dim_out, dim)
         project_in = (
-            nn.Sequential(nn.Linear(dim, inner_dim), nn.GELU())
+            nn.Sequential(Linear(dim, inner_dim), nn.GELU())
             if not glu
             else GEGLU(dim, inner_dim)
         )
 
         self.net = nn.Sequential(
-            project_in, nn.Dropout(dropout), nn.Linear(inner_dim, dim_out)
+            project_in, nn.Dropout(dropout), Linear(inner_dim, dim_out)
         )
 
     def forward(self, x):
@@ -134,8 +138,8 @@ class LinearAttention(nn.Module):
         super().__init__()
         self.heads = heads
         hidden_dim = dim_head * heads
-        self.to_qkv = nn.Conv2d(dim, hidden_dim * 3, 1, bias=False)
-        self.to_out = nn.Conv2d(hidden_dim, dim, 1)
+        self.to_qkv = Conv2d(dim, hidden_dim * 3, 1, bias=False)
+        self.to_out = Conv2d(hidden_dim, dim, 1)
 
     def forward(self, x):
         b, c, h, w = x.shape
@@ -214,12 +218,12 @@ class CrossAttention(nn.Module):
         self.scale = dim_head**-0.5
         self.heads = heads
 
-        self.to_q = nn.Linear(query_dim, inner_dim, bias=False)
-        self.to_k = nn.Linear(context_dim, inner_dim, bias=False)
-        self.to_v = nn.Linear(context_dim, inner_dim, bias=False)
+        self.to_q = Linear(query_dim, inner_dim, bias=False)
+        self.to_k = Linear(context_dim, inner_dim, bias=False)
+        self.to_v = Linear(context_dim, inner_dim, bias=False)
 
         self.to_out = nn.Sequential(
-            nn.Linear(inner_dim, query_dim), nn.Dropout(dropout)
+            Linear(inner_dim, query_dim), nn.Dropout(dropout)
         )
         self.backend = backend
 
@@ -305,12 +309,12 @@ class MemoryEfficientCrossAttention(nn.Module):
         self.heads = heads
         self.dim_head = dim_head
 
-        self.to_q = nn.Linear(query_dim, inner_dim, bias=False)
-        self.to_k = nn.Linear(context_dim, inner_dim, bias=False)
-        self.to_v = nn.Linear(context_dim, inner_dim, bias=False)
+        self.to_q = Linear(query_dim, inner_dim, bias=False)
+        self.to_k = Linear(context_dim, inner_dim, bias=False)
+        self.to_v = Linear(context_dim, inner_dim, bias=False)
 
         self.to_out = nn.Sequential(
-            nn.Linear(inner_dim, query_dim), nn.Dropout(dropout)
+            Linear(inner_dim, query_dim), nn.Dropout(dropout)
         )
         self.attention_op: Optional[Any] = None
 
@@ -584,11 +588,11 @@ class SpatialTransformer(nn.Module):
         inner_dim = n_heads * d_head
         self.norm = Normalize(in_channels)
         if not use_linear:
-            self.proj_in = nn.Conv2d(
+            self.proj_in = Conv2d(
                 in_channels, inner_dim, kernel_size=1, stride=1, padding=0
             )
         else:
-            self.proj_in = nn.Linear(in_channels, inner_dim)
+            self.proj_in = Linear(in_channels, inner_dim)
 
         self.transformer_blocks = nn.ModuleList(
             [
@@ -608,11 +612,11 @@ class SpatialTransformer(nn.Module):
         )
         if not use_linear:
             self.proj_out = zero_module(
-                nn.Conv2d(inner_dim, in_channels, kernel_size=1, stride=1, padding=0)
+                Conv2d(inner_dim, in_channels, kernel_size=1, stride=1, padding=0)
             )
         else:
-            # self.proj_out = zero_module(nn.Linear(in_channels, inner_dim))
-            self.proj_out = zero_module(nn.Linear(inner_dim, in_channels))
+            # self.proj_out = zero_module(Linear(in_channels, inner_dim))
+            self.proj_out = zero_module(Linear(inner_dim, in_channels))
         self.use_linear = use_linear
 
     def forward(self, x, context=None):
