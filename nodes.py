@@ -83,7 +83,8 @@ class SUPIR_Upscale:
                 control_scale, cfg_scale_start, control_scale_start, restoration_scale, keep_model_loaded, 
                 a_prompt, n_prompt, sdxl_model, supir_model, use_tiled_vae, captions="", diffusion_dtype="auto", encoder_dtype="auto"):
         
-        
+        comfy.model_management.unload_all_models()
+        comfy.model_management.soft_empty_cache()
         device = comfy.model_management.get_torch_device()
         image = image.to(device)
         
