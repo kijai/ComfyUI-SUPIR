@@ -93,35 +93,42 @@ class SUPIR_Upscale:
         config_path = os.path.join(script_directory, "options/SUPIR_v0.yaml")
 
         if diffusion_dtype == 'auto':
-            if comfy.model_management.should_use_bf16():
-                print("Diffusion using bf16")
-                dtype = torch.bfloat16
-                model_dtype = 'bf16'
-            elif comfy.model_management.should_use_fp16():
-                print("Diffusion using using fp16")
-                dtype = torch.float16
-                model_dtype = 'fp16'
-            else:
-                print("Diffusion using using fp32")
-                dtype = torch.float32
-                model_dtype = 'fp32'
+            try:
+                if comfy.model_management.should_use_bf16():
+                    print("Diffusion using bf16")
+                    dtype = torch.bfloat16
+                    model_dtype = 'bf16'
+                elif comfy.model_management.should_use_fp16():
+                    print("Diffusion using using fp16")
+                    dtype = torch.float16
+                    model_dtype = 'fp16'
+                else:
+                    print("Diffusion using using fp32")
+                    dtype = torch.float32
+                    model_dtype = 'fp32'
+            except:
+                raise AttributeError("ComfyUI too old, can't autodecet properly. Set your dtypes manually.")
         else:
             print(f"Diffusion using using {diffusion_dtype}")
             dtype = convert_dtype(diffusion_dtype)
             model_dtype = diffusion_dtype
 
         if encoder_dtype == 'auto':
-            if comfy.model_management.should_use_bf16():
-                print("Encoder using bf16")
-                vae_dtype = 'bf16'
-            else:
-                print("Encoder using using fp32")
-                vae_dtype = 'fp32'
+            try:
+                if comfy.model_management.should_use_bf16():
+                    print("Encoder using bf16")
+                    vae_dtype = 'bf16'
+                else:
+                    print("Encoder using using fp32")
+                    vae_dtype = 'fp32'
+            except:
+                raise AttributeError("ComfyUI too old, can't autodetect properly. Set your dtypes manually.")
         else:
             vae_dtype = encoder_dtype
             print(f"Encoder using using {vae_dtype}")
 
         if not hasattr(self, "model") or self.model is None or self.current_sdxl_model != sdxl_model or self.current_diffusion_dtype != diffusion_dtype or self.current_encoder_dtype != encoder_dtype or self.tiled_vae_state != use_tiled_vae:
+            self.model = None
             self.current_diffusion_dtype = diffusion_dtype
             self.current_encoder_dtype = encoder_dtype
             self.current_sdxl_model = sdxl_model
@@ -141,6 +148,10 @@ class SUPIR_Upscale:
                 raise Exception("Failed to load SDXL model")
             self.model.load_state_dict(supir_state_dict, strict=False)
             self.model.load_state_dict(sdxl_state_dict, strict=False)
+
+            del supir_state_dict, sdxl_state_dict
+            comfy.model_management.soft_empty_cache()
+
             self.model.to(device).to(dtype)
             
             if use_tiled_vae:
@@ -148,10 +159,6 @@ class SUPIR_Upscale:
                 self.model.init_tile_vae(encoder_tile_size=encoder_tile_size_pixels, decoder_tile_size=decoder_tile_size_latent)
             else:
                 self.tiled_vae_state = False
-       
-   
-        #autocast_condition = (dtype == torch.float16 or dtype == torch.bfloat16) and not comfy.model_management.is_device_mps(device)
-        #with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=dtype) if autocast_condition else nullcontext():
             
         image, = ImageScaleBy.upscale(self, image, resize_method, scale_by)
         B, H, W, C = image.shape
