@@ -242,10 +242,11 @@ class SUPIR_Upscale:
         if not keep_model_loaded:
             self.model = None
             mm.soft_empty_cache()
-        if len(out[0]) == 3:
-            out_stacked = torch.stack(out, dim=0).cpu().to(torch.float32).permute(0, 2, 3, 1)
-        else:
+
+        if len(out[0].shape) == 4:
             out_stacked = torch.cat(out, dim=0).cpu().to(torch.float32).permute(0, 2, 3, 1)
+        else:
+            out_stacked = torch.stack(out, dim=0).cpu().to(torch.float32).permute(0, 2, 3, 1)
 
         return (out_stacked,)
 
