@@ -152,7 +152,7 @@ class SUPIR_Upscale:
             del supir_state_dict, sdxl_state_dict
             comfy.model_management.soft_empty_cache()
 
-            self.model.to(device).to(dtype)
+            self.model.to(dtype).to(device)
             
             if use_tiled_vae:
                 self.tiled_vae_state = True
@@ -169,7 +169,6 @@ class SUPIR_Upscale:
             
         captions_list = []
         captions_list.append(captions)
-        print(captions_list)
             
         use_linear_CFG = cfg_scale_start > 0
         use_linear_control_scale = control_scale_start > 0
@@ -184,7 +183,7 @@ class SUPIR_Upscale:
                                             cfg_scale_start=cfg_scale_start, control_scale_start=control_scale_start)
             
             out.append(samples.squeeze(0).cpu())
-            print("Sampled image ", i, " out of ", B)
+            print("Sampled image ", i + 1, " out of ", B)
             pbar.update(1)
         if not keep_model_loaded:
                 self.model = None
