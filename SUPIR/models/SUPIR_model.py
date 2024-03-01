@@ -53,6 +53,7 @@ class SUPIRModel(DiffusionEngine):
     @torch.no_grad()
     def encode_first_stage_with_denoise(self, x, use_sample=True, is_stage1=False):
         #with torch.autocast(device, dtype=self.ae_dtype):
+        self.first_stage_model.to(self.ae_dtype)
         autocast_condition = (self.ae_dtype == torch.float16 or self.ae_dtype == torch.bfloat16) and not comfy.model_management.is_device_mps(device)
         with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=self.ae_dtype) if autocast_condition else nullcontext():
             if is_stage1:
