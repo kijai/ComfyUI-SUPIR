@@ -186,10 +186,10 @@ class SUPIR_Upscale:
             out.append(samples.squeeze(0).cpu())
             print("Sampled image ", i, " out of ", B)
             pbar.update(1)
-            if not keep_model_loaded:
-                    self.model = None
-            out_stacked = torch.stack(out, dim=0).cpu().to(torch.float32).permute(0, 2, 3, 1)
-            return(out_stacked,)
+        if not keep_model_loaded:
+                self.model = None
+        out_stacked = torch.stack(out, dim=0).cpu().to(torch.float32).permute(0, 2, 3, 1)
+        return(out_stacked,)
     
 NODE_CLASS_MAPPINGS = {
     "SUPIR_Upscale": SUPIR_Upscale,
