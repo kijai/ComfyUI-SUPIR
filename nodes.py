@@ -49,7 +49,7 @@ class SUPIR_Upscale:
             "keep_model_loaded": ("BOOLEAN", {"default": True}),
             "use_tiled_vae": ("BOOLEAN", {"default": True}),
             "encoder_tile_size_pixels": ("INT", {"default": 512, "min": 64, "max": 8192, "step": 64}),
-            "decoder_tile_size_latent": ("INT", {"default": 64, "min": 64, "max": 8192, "step": 64}),
+            "decoder_tile_size_latent": ("INT", {"default": 64, "min": 32, "max": 8192, "step": 64}),
             },
             "optional": {
                 "captions": ("STRING", {"forceInput": True, "multiline": False, "default": "",}),
@@ -129,8 +129,16 @@ class SUPIR_Upscale:
             config.model.params.ae_dtype = vae_dtype
             config.model.params.diffusion_dtype = model_dtype
             self.model = instantiate_from_config(config.model).cpu()
-            supir_state_dict = load_state_dict(SUPIR_MODEL_PATH)
-            sdxl_state_dict = load_state_dict(SDXL_MODEL_PATH)
+            try:
+                print(f'Attempting to load SUPIR model: [{SUPIR_MODEL_PATH}]')
+                supir_state_dict = load_state_dict(SUPIR_MODEL_PATH)
+            except:
+                raise Exception("Failed to load SUPIR model")
+            try:
+                print(f"Attempting to load SDXL model: [{SDXL_MODEL_PATH}]")
+                sdxl_state_dict = load_state_dict(SDXL_MODEL_PATH)
+            except:
+                raise Exception("Failed to load SDXL model")
             self.model.load_state_dict(supir_state_dict, strict=False)
             self.model.load_state_dict(sdxl_state_dict, strict=False)
             self.model.to(device).to(dtype)
