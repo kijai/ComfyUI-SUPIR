@@ -237,16 +237,11 @@ class SUPIR_Upscale:
             self.model = None
             mm.soft_empty_cache()
 
-        original_height, original_width = H, W  
-        processed_height = samples.size(2)
-        target_width = int(processed_height * (original_width / original_height))
-
         if len(out[0].shape) == 4:
             out_stacked = torch.cat(out, dim=0).cpu().to(torch.float32).permute(0, 2, 3, 1)
         else:
             out_stacked = torch.stack(out, dim=0).cpu().to(torch.float32).permute(0, 2, 3, 1)
-
-        final_image, = ImageScale.upscale(self, out_stacked, "lanczos", target_width, processed_height, crop="disabled")
+        final_image, = ImageScale.upscale(self, out_stacked, "lanczos", W, H, crop="disabled")
 
         return (final_image,)
 
