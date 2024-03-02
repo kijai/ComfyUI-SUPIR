@@ -247,10 +247,8 @@ class SUPIR_Upscale:
 
 
 NODE_CLASS_MAPPINGS = {
-    "SUPIR_Upscale": SUPIR_Upscale,
     "SUPIR_Upscale": SUPIR_Upscale
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "SUPIR_Upscale": "SUPIR_Upscale",
     "SUPIR_Upscale": "SUPIR_Upscale"
 }
