@@ -22,6 +22,7 @@ class SUPIR_Upscale:
         self.current_diffusion_dtype = None
         self.current_encoder_dtype = None
         self.tiled_vae_state = None
+        self.tiled_sampling_state = None
 
     upscale_methods = ["nearest-exact", "bilinear", "area", "bicubic", "lanczos"]
 
@@ -77,6 +78,9 @@ class SUPIR_Upscale:
                         "default": 'auto'
                     }),
                 "batch_size": ("INT", {"default": 1, "min": 1, "max": 128, "step": 1}),
+                "use_tiled_sampling": ("BOOLEAN", {"default": False}),
+                "sampler_tile_size": ("INT", {"default": 1024, "min": 64, "max": 4096, "step": 32}),
+                "sampler_tile_stride": ("INT", {"default": 512, "min": 32, "max": 2048, "step": 32}),
             }
         }
 
@@ -89,7 +93,7 @@ class SUPIR_Upscale:
     def process(self, steps, image, color_fix_type, seed, scale_by, cfg_scale, resize_method, s_churn, s_noise,
                 encoder_tile_size_pixels, decoder_tile_size_latent,
                 control_scale, cfg_scale_start, control_scale_start, restoration_scale, keep_model_loaded,
-                a_prompt, n_prompt, sdxl_model, supir_model, use_tiled_vae, captions="", diffusion_dtype="auto",
+                a_prompt, n_prompt, sdxl_model, supir_model, use_tiled_vae, use_tiled_sampling=False, sampler_tile_size=128, sampler_tile_stride=64, captions="", diffusion_dtype="auto",
                 encoder_dtype="auto", batch_size=1):
 
         device = mm.get_torch_device()
@@ -99,6 +103,7 @@ class SUPIR_Upscale:
         SDXL_MODEL_PATH = folder_paths.get_full_path("checkpoints", sdxl_model)
 
         config_path = os.path.join(script_directory, "options/SUPIR_v0.yaml")
+        config_path_tiled = os.path.join(script_directory, "options/SUPIR_v0_tiled.yaml")
 
         if diffusion_dtype == 'auto':
             try:
@@ -135,16 +140,28 @@ class SUPIR_Upscale:
             vae_dtype = encoder_dtype
             print(f"Encoder using using {vae_dtype}")
 
-        if not hasattr(self, "model") or self.model is None or self.current_sdxl_model != sdxl_model or self.current_diffusion_dtype != diffusion_dtype or self.current_encoder_dtype != encoder_dtype or self.tiled_vae_state != use_tiled_vae or self.current_supir_model != supir_model:
+        if not hasattr(self, "model") or self.model is None or self.current_sdxl_model != sdxl_model or self.current_diffusion_dtype != diffusion_dtype or self.current_encoder_dtype != encoder_dtype or self.tiled_vae_state != use_tiled_vae or self.current_supir_model != supir_model or self.tiled_sampling_state != use_tiled_sampling:
             self.model = None
             mm.soft_empty_cache()
             self.current_diffusion_dtype = diffusion_dtype
             self.current_encoder_dtype = encoder_dtype
             self.current_sdxl_model = sdxl_model
             self.current_supir_model = supir_model
-            config = OmegaConf.load(config_path)
+            
+            if use_tiled_sampling:
+                self.tiled_sampling_state = True
+                config = OmegaConf.load(config_path_tiled)
+                config.model.params.sampler_config.params.tile_size = sampler_tile_size // 8
+                config.model.params.sampler_config.params.tile_stride = sampler_tile_stride // 8
+                print("Using tiled sampling")
+            else:
+                self.tiled_sampling_state = False
+                config = OmegaConf.load(config_path)
+                print("Using non-tiled sampling")
+
             config.model.params.ae_dtype = vae_dtype
             config.model.params.diffusion_dtype = model_dtype
+
             self.model = instantiate_from_config(config.model).cpu()
             try:
                 print(f'Attempting to load SUPIR model: [{SUPIR_MODEL_PATH}]')
