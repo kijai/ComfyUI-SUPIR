@@ -7,6 +7,7 @@ import comfy.utils
 import comfy.model_management as mm
 import folder_paths
 from nodes import ImageScaleBy
+from nodes import ImageScale
 import torch.cuda
 from .sgm.util import instantiate_from_config
 from .SUPIR.util import convert_dtype, load_state_dict
@@ -236,12 +237,18 @@ class SUPIR_Upscale:
             self.model = None
             mm.soft_empty_cache()
 
+        original_height, original_width = H, W  
+        processed_height = samples.size(2)
+        target_width = int(processed_height * (original_width / original_height))
+
         if len(out[0].shape) == 4:
             out_stacked = torch.cat(out, dim=0).cpu().to(torch.float32).permute(0, 2, 3, 1)
         else:
             out_stacked = torch.stack(out, dim=0).cpu().to(torch.float32).permute(0, 2, 3, 1)
 
-        return (out_stacked,)
+        final_image, = ImageScale.upscale(self, out_stacked, "lanczos", target_width, processed_height, crop="disabled")
+
+        return (final_image,)
 
 
 NODE_CLASS_MAPPINGS = {
