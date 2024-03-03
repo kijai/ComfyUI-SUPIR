@@ -13,7 +13,13 @@ from .sgm.util import instantiate_from_config
 from .SUPIR.util import convert_dtype, load_state_dict
 
 script_directory = os.path.dirname(os.path.abspath(__file__))
+try:
+    import xformers
+    import xformers.ops
 
+    XFORMERS_IS_AVAILABLE = True
+except:
+    XFORMERS_IS_AVAILABLE = False
 
 class SUPIR_Upscale:
     def __init__(self):
@@ -81,7 +87,6 @@ class SUPIR_Upscale:
                 "use_tiled_sampling": ("BOOLEAN", {"default": False}),
                 "sampler_tile_size": ("INT", {"default": 1024, "min": 64, "max": 4096, "step": 32}),
                 "sampler_tile_stride": ("INT", {"default": 512, "min": 32, "max": 2048, "step": 32}),
-                "use_xformers": ("BOOLEAN", {"default": True}),
             }
         }
 
@@ -95,7 +100,7 @@ class SUPIR_Upscale:
                 encoder_tile_size_pixels, decoder_tile_size_latent,
                 control_scale, cfg_scale_start, control_scale_start, restoration_scale, keep_model_loaded,
                 a_prompt, n_prompt, sdxl_model, supir_model, use_tiled_vae, use_tiled_sampling=False, sampler_tile_size=128, sampler_tile_stride=64, captions="", diffusion_dtype="auto",
-                encoder_dtype="auto", batch_size=1, use_xformers=False):
+                encoder_dtype="auto", batch_size=1):
 
         device = mm.get_torch_device()
         image = image.to(device)
@@ -113,7 +118,6 @@ class SUPIR_Upscale:
             'use_tiled_vae': use_tiled_vae,
             'supir_model': supir_model,
             'use_tiled_sampling': use_tiled_sampling,
-            'use_xformers': use_xformers
         }
 
         if diffusion_dtype == 'auto':
@@ -165,7 +169,7 @@ class SUPIR_Upscale:
                 config = OmegaConf.load(config_path)
                 print("Using non-tiled sampling")
 
-            if use_xformers:
+            if XFORMERS_IS_AVAILABLE:
                 config.model.params.control_stage_config.params.spatial_transformer_attn_type = "softmax-xformers"
                 config.model.params.network_config.params.spatial_transformer_attn_type = "softmax-xformers"
                 config.model.params.first_stage_config.params.ddconfig.attn_type = "vanilla-xformers" 

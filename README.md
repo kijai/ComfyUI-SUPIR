@@ -12,7 +12,7 @@ or if you use portable (run this in ComfyUI_windows_portable -folder):
 
 `python_embeded\python.exe -m pip install -r ComfyUI\custom_nodes\ComfyUI-SUPIR\requirements.txt`
 
-Additionally `xformers` seems to currently be necessary, a safe way (often problem on Windows) to install/update it is with:
+`xformers` can be disabled in the node and should not be necessary, it can be a bit faster though:
 
 `pip install -U xformers --no-dependencies`  (for portable `python_embeded\python.exe -m pip install -U xformers --no-dependencies` )
 
