@@ -42,7 +42,7 @@ class SUPIR_Upscale:
             "n_prompt": ("STRING", {"multiline": True, "default": "bad quality, blurry, messy", }),
             "s_churn": ("INT", {"default": 5, "min": 0, "max": 40, "step": 1}),
             "s_noise": ("FLOAT", {"default": 1.003, "min": 1.0, "max": 1.1, "step": 0.001}),
-            "control_scale": ("FLOAT", {"default": 1.0, "min": 0, "max": 1, "step": 0.05}),
+            "control_scale": ("FLOAT", {"default": 1.0, "min": 0, "max": 10.0, "step": 0.05}),
             "cfg_scale_start": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 9.0, "step": 0.05}),
             "control_scale_start": ("FLOAT", {"default": 0.0, "min": 0, "max": 1.0, "step": 0.05}),
             "color_fix_type": (
@@ -81,6 +81,7 @@ class SUPIR_Upscale:
                 "use_tiled_sampling": ("BOOLEAN", {"default": False}),
                 "sampler_tile_size": ("INT", {"default": 1024, "min": 64, "max": 4096, "step": 32}),
                 "sampler_tile_stride": ("INT", {"default": 512, "min": 32, "max": 2048, "step": 32}),
+                "use_xformers": ("BOOLEAN", {"default": True}),
             }
         }
 
@@ -94,7 +95,7 @@ class SUPIR_Upscale:
                 encoder_tile_size_pixels, decoder_tile_size_latent,
                 control_scale, cfg_scale_start, control_scale_start, restoration_scale, keep_model_loaded,
                 a_prompt, n_prompt, sdxl_model, supir_model, use_tiled_vae, use_tiled_sampling=False, sampler_tile_size=128, sampler_tile_stride=64, captions="", diffusion_dtype="auto",
-                encoder_dtype="auto", batch_size=1):
+                encoder_dtype="auto", batch_size=1, use_xformers=False):
 
         device = mm.get_torch_device()
         image = image.to(device)
@@ -104,6 +105,16 @@ class SUPIR_Upscale:
 
         config_path = os.path.join(script_directory, "options/SUPIR_v0.yaml")
         config_path_tiled = os.path.join(script_directory, "options/SUPIR_v0_tiled.yaml")
+
+        custom_config = {
+            'sdxl_model': sdxl_model,
+            'diffusion_dtype': diffusion_dtype,
+            'encoder_dtype': encoder_dtype,
+            'use_tiled_vae': use_tiled_vae,
+            'supir_model': supir_model,
+            'use_tiled_sampling': use_tiled_sampling,
+            'use_xformers': use_xformers
+        }
 
         if diffusion_dtype == 'auto':
             try:
@@ -140,25 +151,25 @@ class SUPIR_Upscale:
             vae_dtype = encoder_dtype
             print(f"Encoder using using {vae_dtype}")
 
-        if not hasattr(self, "model") or self.model is None or self.current_sdxl_model != sdxl_model or self.current_diffusion_dtype != diffusion_dtype or self.current_encoder_dtype != encoder_dtype or self.tiled_vae_state != use_tiled_vae or self.current_supir_model != supir_model or self.tiled_sampling_state != use_tiled_sampling:
+        if not hasattr(self, "model") or self.model is None or self.current_config != custom_config:
+            self.current_config = custom_config
             self.model = None
             mm.soft_empty_cache()
-            self.current_diffusion_dtype = diffusion_dtype
-            self.current_encoder_dtype = encoder_dtype
-            self.current_sdxl_model = sdxl_model
-            self.current_supir_model = supir_model
             
             if use_tiled_sampling:
-                self.tiled_sampling_state = True
                 config = OmegaConf.load(config_path_tiled)
                 config.model.params.sampler_config.params.tile_size = sampler_tile_size // 8
                 config.model.params.sampler_config.params.tile_stride = sampler_tile_stride // 8
                 print("Using tiled sampling")
             else:
-                self.tiled_sampling_state = False
                 config = OmegaConf.load(config_path)
                 print("Using non-tiled sampling")
 
+            if use_xformers:
+                config.model.params.control_stage_config.params.spatial_transformer_attn_type = "softmax-xformers"
+                config.model.params.network_config.params.spatial_transformer_attn_type = "softmax-xformers"
+                config.model.params.first_stage_config.params.ddconfig.attn_type = "vanilla-xformers" 
+                
             config.model.params.ae_dtype = vae_dtype
             config.model.params.diffusion_dtype = model_dtype
 
@@ -194,11 +205,7 @@ class SUPIR_Upscale:
                 mm.soft_empty_cache()
 
             if use_tiled_vae:
-                self.tiled_vae_state = True
-                self.model.init_tile_vae(encoder_tile_size=encoder_tile_size_pixels,
-                                         decoder_tile_size=decoder_tile_size_latent)
-            else:
-                self.tiled_vae_state = False
+                self.model.init_tile_vae(encoder_tile_size=encoder_tile_size_pixels, decoder_tile_size=decoder_tile_size_latent)
 
         image, = ImageScaleBy.upscale(self, image, resize_method, scale_by)
         B, H, W, C = image.shape

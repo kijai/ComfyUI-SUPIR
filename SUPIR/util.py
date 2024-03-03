@@ -1,7 +1,7 @@
 import os
 import torch
 import numpy as np
-import cv2
+#import cv2
 from PIL import Image
 from torch.nn.functional import interpolate
 from omegaconf import OmegaConf
