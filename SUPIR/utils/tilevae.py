@@ -371,7 +371,8 @@ def attn2task(task_queue, net):
             task_queue.append(
                 ('attn', lambda x, net=net: xformer_attn_forward(net, x)))
         elif hasattr(F, "scaled_dot_product_attention"):
-            task_queue.append(('attn', lambda x, net=net: attn_forward_new_pt2_0(net, x)))
+            task_queue.append(('attn', lambda x, net=net: attn_forward(net, x)))
+            #task_queue.append(('attn', lambda x, net=net: attn_forward_new_pt2_0(net, x)))
         else:
             task_queue.append(('attn', lambda x, net=net: attn_forward_new(net, x)))
         task_queue.append(['add_res', None])

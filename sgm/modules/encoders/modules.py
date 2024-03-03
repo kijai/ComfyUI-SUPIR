@@ -482,7 +482,7 @@ class FrozenCLIPEmbedder(AbstractEmbModel):
         for param in self.parameters():
             param.requires_grad = False
 
-    @autocast
+    #@autocast
     def forward(self, text):
         batch_encoding = self.tokenizer(
             text,
