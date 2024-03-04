@@ -14,7 +14,7 @@ or if you use portable (run this in ComfyUI_windows_portable -folder):
 
 Pytorch version should be pretty new too, latest stable (2.2.1) works.
 
-`xformers` can be disabled in the node and should not be necessary, in some cases it can be a bit faster though:
+`xformers` is automatically detected and enabeld if found, but it's not necessary, in some cases it can be a bit faster though:
 
 `pip install -U xformers --no-dependencies`  (for portable `python_embeded\python.exe -m pip install -U xformers --no-dependencies` )
 
