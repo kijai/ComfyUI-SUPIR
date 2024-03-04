@@ -533,7 +533,7 @@ def gaussian_weights(tile_width, tile_height, nbatches):
                for y in range(latent_height)]
     
     if comfy.model_management.is_device_mps(device):
-        weights = np.outer(y_probs, x_probs, dtype=np.float32)
+        weights = np.outer(y_probs, x_probs).astype(np.float32)
     else:
         weights = np.outer(y_probs, x_probs)
    
