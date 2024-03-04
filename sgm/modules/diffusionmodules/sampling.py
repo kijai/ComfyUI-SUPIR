@@ -20,6 +20,8 @@ from ...util import append_dims, default, instantiate_from_config
 
 DEFAULT_GUIDER = {"target": ".sgm.modules.diffusionmodules.guiders.IdentityGuider"}
 
+import comfy.model_management
+device = comfy.model_management.get_torch_device()
 
 class BaseDiffusionSampler:
     def __init__(
@@ -39,7 +41,7 @@ class BaseDiffusionSampler:
             )
         )
         self.verbose = verbose
-        self.device = device
+        self.device = comfy.model_management.get_torch_device()
 
     def prepare_sampling_loop(self, x, cond, uc=None, num_steps=None):
         sigmas = self.discretization(
@@ -531,7 +533,7 @@ def gaussian_weights(tile_width, tile_height, nbatches):
                for y in range(latent_height)]
 
     weights = np.outer(y_probs, x_probs)
-    return torch.tile(torch.tensor(weights, device='cuda'), (nbatches, 4, 1, 1))
+    return torch.tile(torch.tensor(weights, device=device), (nbatches, 4, 1, 1))
 
 
 def _sliding_windows(h: int, w: int, tile_size: int, tile_stride: int):

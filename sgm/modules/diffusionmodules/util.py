@@ -15,6 +15,9 @@ import torch
 import torch.nn as nn
 from einops import repeat
 
+import comfy.model_management
+device = comfy.model_management.get_torch_device()
+from contextlib import nullcontext
 
 def make_beta_schedule(
     schedule,
@@ -185,7 +188,8 @@ class CheckpointFunction(torch.autograd.Function):
     @staticmethod
     def backward(ctx, *output_grads):
         ctx.input_tensors = [x.detach().requires_grad_(True) for x in ctx.input_tensors]
-        with torch.enable_grad(), torch.cuda.amp.autocast(**ctx.gpu_autocast_kwargs):
+        autocast_condition = (ctx.input_tensors.dtype == torch.float16 or ctx.input_tensors.dtype == torch.bfloat16) and not comfy.model_management.is_device_mps(device)
+        with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=ctx.input_tensors.dtype) if autocast_condition else nullcontext():
             # Fixes a bug where the first op in run_function modifies the
             # Tensor storage in place, which is not allowed for detach()'d
             # Tensors.
