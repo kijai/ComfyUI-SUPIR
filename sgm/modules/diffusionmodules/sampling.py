@@ -531,8 +531,12 @@ def gaussian_weights(tile_width, tile_height, nbatches):
     midpoint = latent_height / 2
     y_probs = [exp(-(y - midpoint) * (y - midpoint) / (latent_height * latent_height) / (2 * var)) / sqrt(2 * pi * var)
                for y in range(latent_height)]
-
-    weights = np.outer(y_probs, x_probs)
+    
+    if comfy.model_management.is_device_mps(device):
+        weights = np.outer(y_probs, x_probs, dtype=np.float32)
+    else:
+        weights = np.outer(y_probs, x_probs)
+   
     return torch.tile(torch.tensor(weights, device=device), (nbatches, 4, 1, 1))
 
 
