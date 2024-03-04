@@ -6,7 +6,9 @@ from packaging import version
 # torch._dynamo.config.cache_size_limit = 512
 
 OPENAIUNETWRAPPER = ".sgm.modules.diffusionmodules.wrappers.OpenAIWrapper"
-
+import comfy.model_management
+from contextlib import nullcontext
+device = comfy.model_management.get_torch_device()
 
 class IdentityWrapper(nn.Module):
     def __init__(self, diffusion_model, compile_model: bool = False):
@@ -84,7 +86,8 @@ class ControlWrapper(nn.Module):
     def forward(
             self, x: torch.Tensor, t: torch.Tensor, c: dict, control_scale=1, **kwargs
     ) -> torch.Tensor:
-        with torch.autocast("cuda", dtype=self.dtype):
+        autocast_condition = (self.dtype == torch.float16 or self.dtype == torch.bfloat16) and not comfy.model_management.is_device_mps(device)
+        with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=self.dtype) if autocast_condition else nullcontext():
             control = self.control_model(x=c.get("control", None), timesteps=t, xt=x,
                                          control_vector=c.get("control_vector", None),
                                          mask_x=c.get("mask_x", None),

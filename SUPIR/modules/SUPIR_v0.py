@@ -24,6 +24,8 @@ import re
 import torch
 from functools import partial
 
+import comfy.model_management
+device = comfy.model_management.get_torch_device()
 
 try:
     import xformers
@@ -680,14 +682,14 @@ if __name__ == '__main__':
     #
     # model = instantiate_from_config(opt.model.params.control_stage_config)
     # hint = model(torch.randn([1, 4, 64, 64]), torch.randn([1]), torch.randn([1, 4, 64, 64]))
-    # hint = [h.cuda() for h in hint]
+    # hint = [h.device for h in hint]
     # print(sum(map(lambda hint: hint.numel(), model.parameters())))
     #
     # unet = instantiate_from_config(opt.model.params.network_config)
-    # unet = unet.cuda()
+    # unet = unet.device
     #
-    # _output = unet(torch.randn([1, 4, 64, 64]).cuda(), torch.randn([1]).cuda(), torch.randn([1, 77, 1280]).cuda(),
-    #                torch.randn([1, 2560]).cuda(), hint)
+    # _output = unet(torch.randn([1, 4, 64, 64]).device, torch.randn([1]).device, torch.randn([1, 77, 1280]).device,
+    #                torch.randn([1, 2560]).device, hint)
     # print(sum(map(lambda _output: _output.numel(), unet.parameters())))
 
     # base
@@ -695,31 +697,31 @@ if __name__ == '__main__':
         opt = OmegaConf.load('../../options/dev/SUPIR_tmp.yaml')
 
         model = instantiate_from_config(opt.model.params.control_stage_config)
-        model = model.cuda()
+        model = model.to(device)
 
-        hint = model(torch.randn([1, 4, 64, 64]).cuda(), torch.randn([1]).cuda(), torch.randn([1, 4, 64, 64]).cuda(), torch.randn([1, 77, 2048]).cuda(),
-                       torch.randn([1, 2816]).cuda())
+        hint = model(torch.randn([1, 4, 64, 64]).device, torch.randn([1]).device, torch.randn([1, 4, 64, 64]).device, torch.randn([1, 77, 2048]).device,
+                       torch.randn([1, 2816]).device)
 
         #for h in hint:
         #    print(h.shape)
         #
         unet = instantiate_from_config(opt.model.params.network_config)
-        unet = unet.cuda()
-        _output = unet(torch.randn([1, 4, 64, 64]).cuda(), torch.randn([1]).cuda(), torch.randn([1, 77, 2048]).cuda(),
-                       torch.randn([1, 2816]).cuda(), hint)
+        unet = unet.to(device)
+        _output = unet(torch.randn([1, 4, 64, 64]).device, torch.randn([1]).device, torch.randn([1, 77, 2048]).device,
+                       torch.randn([1, 2816]).device, hint)
 
 
         # model = instantiate_from_config(opt.model.params.control_stage_config)
-        # model = model.cuda()
+        # model = model.device
         # # hint = model(torch.randn([1, 4, 64, 64]), torch.randn([1]), torch.randn([1, 4, 64, 64]))
-        # hint = model(torch.randn([1, 4, 64, 64]).cuda(), torch.randn([1]).cuda(), torch.randn([1, 4, 64, 64]).cuda(), torch.randn([1, 77, 1280]).cuda(),
-        #                torch.randn([1, 2560]).cuda())
-        # # hint = [h.cuda() for h in hint]
+        # hint = model(torch.randn([1, 4, 64, 64]).device, torch.randn([1]).device, torch.randn([1, 4, 64, 64]).device, torch.randn([1, 77, 1280]).device,
+        #                torch.randn([1, 2560]).device)
+        # # hint = [h.device for h in hint]
         #
         # for h in hint:
         #     print(h.shape)
         #
         # unet = instantiate_from_config(opt.model.params.network_config)
-        # unet = unet.cuda()
-        # _output = unet(torch.randn([1, 4, 64, 64]).cuda(), torch.randn([1]).cuda(), torch.randn([1, 77, 1280]).cuda(),
-        #                torch.randn([1, 2560]).cuda(), hint)
+        # unet = unet.device
+        # _output = unet(torch.randn([1, 4, 64, 64]).device, torch.randn([1]).device, torch.randn([1, 77, 1280]).device,
+        #                torch.randn([1, 2560]).device, hint)

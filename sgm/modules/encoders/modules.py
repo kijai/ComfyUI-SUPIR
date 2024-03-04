@@ -33,6 +33,8 @@ from ...util import (
 )
 
 from ....CKPT_PTH import SDXL_CLIP1_PATH, SDXL_CLIP2_CKPT_PTH
+import comfy.model_management
+device = comfy.model_management.get_torch_device()
 
 class Conv2d(torch.nn.Conv2d):
     def reset_parameters(self):
@@ -342,7 +344,7 @@ class ClassEmbedder(AbstractEmbModel):
             c = c[:, None, :]
         return c
 
-    def get_unconditional_conditioning(self, bs, device="cuda"):
+    def get_unconditional_conditioning(self, bs, device=device):
         uc_class = (
             self.n_classes - 1
         )  # 1000 classes --> 0 ... 999, one extra class for ucg (class 1000)
@@ -367,7 +369,7 @@ class FrozenT5Embedder(AbstractEmbModel):
     """Uses the T5 transformer encoder for text"""
 
     def __init__(
-        self, version="google/t5-v1_1-xxl", device="cuda", max_length=77, freeze=True
+        self, version="google/t5-v1_1-xxl", device=device, max_length=77, freeze=True
     ):  # others are google/t5-v1_1-xl and google/t5-v1_1-xxl
         super().__init__()
         self.tokenizer = T5Tokenizer.from_pretrained(version)
@@ -395,7 +397,7 @@ class FrozenT5Embedder(AbstractEmbModel):
             return_tensors="pt",
         )
         tokens = batch_encoding["input_ids"].to(self.device)
-        with torch.autocast("cuda", enabled=False):
+        with torch.autocast(device, enabled=False):
             outputs = self.transformer(input_ids=tokens)
         z = outputs.last_hidden_state
         return z
@@ -410,7 +412,7 @@ class FrozenByT5Embedder(AbstractEmbModel):
     """
 
     def __init__(
-        self, version="google/byt5-base", device="cuda", max_length=77, freeze=True
+        self, version="google/byt5-base", device=device, max_length=77, freeze=True
     ):  # others are google/t5-v1_1-xl and google/t5-v1_1-xxl
         super().__init__()
         self.tokenizer = ByT5Tokenizer.from_pretrained(version)
@@ -437,7 +439,7 @@ class FrozenByT5Embedder(AbstractEmbModel):
             return_tensors="pt",
         )
         tokens = batch_encoding["input_ids"].to(self.device)
-        with torch.autocast("cuda", enabled=False):
+        with torch.autocast(device, enabled=False):
             outputs = self.transformer(input_ids=tokens)
         z = outputs.last_hidden_state
         return z
@@ -454,7 +456,7 @@ class FrozenCLIPEmbedder(AbstractEmbModel):
     def __init__(
         self,
         version="openai/clip-vit-large-patch14",
-        device="cuda",
+        device=device,
         max_length=77,
         freeze=True,
         layer="last",
@@ -522,7 +524,7 @@ class FrozenOpenCLIPEmbedder2(AbstractEmbModel):
         self,
         arch="ViT-H-14",
         version="laion2b_s32b_b79k",
-        device="cuda",
+        device=device,
         max_length=77,
         freeze=True,
         layer="last",
@@ -558,7 +560,7 @@ class FrozenOpenCLIPEmbedder2(AbstractEmbModel):
         for param in self.parameters():
             param.requires_grad = False
 
-    @autocast
+    #@autocast
     def forward(self, text):
         tokens = open_clip.tokenize(text)
         z = self.encode_with_transformer(tokens.to(self.device))
@@ -624,7 +626,7 @@ class FrozenOpenCLIPEmbedder(AbstractEmbModel):
         self,
         arch="ViT-H-14",
         version="laion2b_s32b_b79k",
-        device="cuda",
+        device=device,
         max_length=77,
         freeze=True,
         layer="last",
@@ -694,7 +696,7 @@ class FrozenOpenCLIPImageEmbedder(AbstractEmbModel):
         self,
         arch="ViT-H-14",
         version="laion2b_s32b_b79k",
-        device="cuda",
+        device=device,
         max_length=77,
         freeze=True,
         antialias=True,
@@ -753,7 +755,7 @@ class FrozenOpenCLIPImageEmbedder(AbstractEmbModel):
         for param in self.parameters():
             param.requires_grad = False
 
-    @autocast
+    # @autocast
     def forward(self, image, no_dropout=False):
         z = self.encode_with_vision_transformer(image)
         tokens = None
@@ -850,7 +852,7 @@ class FrozenCLIPT5Encoder(AbstractEmbModel):
         self,
         clip_version="openai/clip-vit-large-patch14",
         t5_version="google/t5-v1_1-xl",
-        device="cuda",
+        device=device,
         clip_max_length=77,
         t5_max_length=77,
     ):
