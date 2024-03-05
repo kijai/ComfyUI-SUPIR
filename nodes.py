@@ -43,13 +43,13 @@ class SUPIR_Upscale:
             "scale_by": ("FLOAT", {"default": 1.0, "min": 0.01, "max": 20.0, "step": 0.01}),
             "steps": ("INT", {"default": 45, "min": 3, "max": 4096, "step": 1}),
             "restoration_scale": ("FLOAT", {"default": -1.0, "min": -1.0, "max": 6.0, "step": 1.0}),
-            "cfg_scale": ("FLOAT", {"default": 7.5, "min": 0, "max": 20, "step": 0.01}),
+            "cfg_scale": ("FLOAT", {"default": 4.0, "min": 0, "max": 20, "step": 0.01}),
             "a_prompt": ("STRING", {"multiline": True, "default": "high quality, detailed", }),
             "n_prompt": ("STRING", {"multiline": True, "default": "bad quality, blurry, messy", }),
             "s_churn": ("INT", {"default": 5, "min": 0, "max": 40, "step": 1}),
             "s_noise": ("FLOAT", {"default": 1.003, "min": 1.0, "max": 1.1, "step": 0.001}),
             "control_scale": ("FLOAT", {"default": 1.0, "min": 0, "max": 10.0, "step": 0.05}),
-            "cfg_scale_start": ("FLOAT", {"default": 0.0, "min": 0.0, "max": 9.0, "step": 0.05}),
+            "cfg_scale_start": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 9.0, "step": 0.05}),
             "control_scale_start": ("FLOAT", {"default": 0.0, "min": 0, "max": 1.0, "step": 0.05}),
             "color_fix_type": (
                 [
@@ -57,7 +57,7 @@ class SUPIR_Upscale:
                     'AdaIn',
                     'Wavelet',
                 ], {
-                    "default": 'None'
+                    "default": 'Wavelet'
                 }),
             "keep_model_loaded": ("BOOLEAN", {"default": True}),
             "use_tiled_vae": ("BOOLEAN", {"default": True}),
@@ -217,22 +217,19 @@ class SUPIR_Upscale:
         new_width = W // 64 * 64
         image = image.permute(0, 3, 1, 2).contiguous()
         resized_image = F.interpolate(image, size=(new_height, new_width), mode='bicubic', align_corners=False)
-        resized_typed_images = resized_image.to(dtype)
-        del resized_image
-        mm.soft_empty_cache()
 
         captions_list = []
         captions_list.append(captions)
-        print(captions_list)
+        print("captions: ", captions_list)
 
         use_linear_CFG = cfg_scale_start > 0
         use_linear_control_scale = control_scale_start > 0
         out = []
         pbar = comfy.utils.ProgressBar(B)
 
-        batched_images = [resized_typed_images[i:i + batch_size] for i in
-                          range(0, len(resized_typed_images), batch_size)]
-        captions_list = captions_list * resized_typed_images.shape[0]
+        batched_images = [resized_image[i:i + batch_size] for i in
+                          range(0, len(resized_image), batch_size)]
+        captions_list = captions_list * resized_image.shape[0]
         batched_captions = [captions_list[i:i + batch_size] for i in range(0, len(captions_list), batch_size)]
 
         mm.soft_empty_cache()

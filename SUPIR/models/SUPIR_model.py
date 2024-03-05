@@ -120,6 +120,8 @@ class SUPIRModel(DiffusionEngine):
         self.sampler_config.params.s_noise = s_noise
         self.sampler = instantiate_from_config(self.sampler_config)
 
+        print("sampler_config: ", self.sampler_config.params)
+
         if seed == -1:
             seed = random.randint(0, 65535)
         seed_everything(seed)
@@ -173,10 +175,13 @@ class SUPIRModel(DiffusionEngine):
         batch_uc['txt'] = [n_p for _ in p]
         autocast_condition = (self.model.dtype == torch.float16 or self.model.dtype == torch.bfloat16) and not comfy.model_management.is_device_mps(device)
         if not isinstance(p[0], list):
+            print("Using local prompt: ")
             batch['txt'] = [''.join([_p, p_p]) for _p in p]
+            print(batch['txt'])
             with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=self.model.dtype) if autocast_condition else nullcontext():
                 c, uc = self.conditioner.get_unconditional_conditioning(batch, batch_uc)
         else:
+            print("Using tile prompts")
             assert len(p) == 1, 'Support bs=1 only for local prompt conditioning.'
             p_tiles = p[0]
             c = []

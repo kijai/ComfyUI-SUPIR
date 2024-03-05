@@ -33,14 +33,6 @@ try:
     XFORMERS_IS_AVAILBLE = True
 except:
     XFORMERS_IS_AVAILBLE = False
-
-class Conv2d(torch.nn.Conv2d):
-    def reset_parameters(self):
-        return None
-    
-class Linear(torch.nn.Linear):
-    def reset_parameters(self):
-        return None
     
 # dummy replace
 def convert_module_to_f16(x):
@@ -85,11 +77,11 @@ class ZeroSFT(nn.Module):
         nhidden = 128
 
         self.mlp_shared = nn.Sequential(
-            Conv2d(label_nc, nhidden, kernel_size=ks, padding=pw),
+            nn.Conv2d(label_nc, nhidden, kernel_size=ks, padding=pw),
             nn.SiLU()
         )
-        self.zero_mul = zero_module(Conv2d(nhidden, norm_nc + concat_channels, kernel_size=ks, padding=pw))
-        self.zero_add = zero_module(Conv2d(nhidden, norm_nc + concat_channels, kernel_size=ks, padding=pw))
+        self.zero_mul = zero_module(nn.Conv2d(nhidden, norm_nc + concat_channels, kernel_size=ks, padding=pw))
+        self.zero_add = zero_module(nn.Conv2d(nhidden, norm_nc + concat_channels, kernel_size=ks, padding=pw))
         # self.zero_mul = nn.Conv2d(nhidden, norm_nc + concat_channels, kernel_size=ks, padding=pw)
         # self.zero_add = nn.Conv2d(nhidden, norm_nc + concat_channels, kernel_size=ks, padding=pw)
 
@@ -304,7 +296,7 @@ class GLVControl(nn.Module):
                 self.label_emb = nn.Embedding(num_classes, time_embed_dim)
             elif self.num_classes == "continuous":
                 print("setting up linear c_adm embedding layer")
-                self.label_emb = Linear(1, time_embed_dim)
+                self.label_emb = nn.Linear(1, time_embed_dim)
             elif self.num_classes == "timestep":
                 self.label_emb = checkpoint_wrapper_fn(
                     nn.Sequential(
