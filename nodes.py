@@ -158,6 +158,7 @@ class SUPIR_Upscale:
         if not hasattr(self, "model") or self.model is None or self.current_config != custom_config:
             self.current_config = custom_config
             self.model = None
+            mm.unload_all_models()
             mm.soft_empty_cache()
             
             if use_tiled_sampling:
