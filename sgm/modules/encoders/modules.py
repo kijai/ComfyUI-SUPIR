@@ -461,12 +461,17 @@ class FrozenCLIPEmbedder(AbstractEmbModel):
     ):  # clip-vit-base-patch32
         super().__init__()
         assert layer in self.LAYERS
-        self.tokenizer = CLIPTokenizer.from_pretrained(version if SDXL_CLIP1_PATH is None else SDXL_CLIP1_PATH)
-        self.transformer = CLIPTextModel.from_pretrained(version if SDXL_CLIP1_PATH is None else SDXL_CLIP1_PATH)
+        #self.tokenizer = CLIPTokenizer.from_pretrained(version if SDXL_CLIP1_PATH is None else SDXL_CLIP1_PATH)
+        #self.transformer = CLIPTextModel.from_pretrained(version if SDXL_CLIP1_PATH is None else SDXL_CLIP1_PATH)
+        #self.clip_text_config = CLIPTextConfig.from_pretrained("openai/clip-vit-large-patch14")
+        #self.tokenizer = CLIPTokenizer.from_pretrained(version)
+        self.tokenizer = None
+        #self.transformer = CLIPTextModel(self.clip_text_config)
+        self.transformer = None
         self.device = device
         self.max_length = max_length
-        if freeze:
-            self.freeze()
+        #if freeze:
+        #    self.freeze()
         self.layer = layer
         self.layer_idx = layer_idx
         self.return_pooled = always_return_pooled
@@ -529,19 +534,20 @@ class FrozenOpenCLIPEmbedder2(AbstractEmbModel):
     ):
         super().__init__()
         assert layer in self.LAYERS
-        model, _, _ = open_clip.create_model_and_transforms(
-            arch,
-            device=torch.device("cpu"),
-            pretrained=version if SDXL_CLIP2_CKPT_PTH is None else SDXL_CLIP2_CKPT_PTH,
-        )
-        del model.visual
-        self.model = model
-
+        # model, _, _ = open_clip.create_model_and_transforms(
+        #      arch,
+        #      device=torch.device("cpu"),
+        #      pretrained=version if SDXL_CLIP2_CKPT_PTH is None else SDXL_CLIP2_CKPT_PTH,
+        #  )
+        
+        # del model.visual
+        # self.model = model
+        self.model = None
         self.device = device
         self.max_length = max_length
         self.return_pooled = always_return_pooled
-        if freeze:
-            self.freeze()
+        #if freeze:
+        #    self.freeze()
         self.layer = layer
         if self.layer == "last":
             self.layer_idx = 0
