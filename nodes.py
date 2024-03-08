@@ -1,5 +1,6 @@
 import os
 import torch
+import torch.nn as nn
 from torch.nn import functional as F
 from contextlib import nullcontext
 from omegaconf import OmegaConf
@@ -11,8 +12,11 @@ from nodes import ImageScale
 import torch.cuda
 from .sgm.util import instantiate_from_config
 from .SUPIR.util import convert_dtype, load_state_dict
-
+from typing import Optional
+import numpy as np
+import open_clip
 from open_clip import CLIP, CLIPTextCfg
+
 from transformers import (
     CLIPTextModel,
     CLIPTokenizer,
@@ -30,6 +34,10 @@ except:
     XFORMERS_IS_AVAILABLE = False
 
 
+def dummy_build_vision_tower(*args, **kwargs):
+    # Monkey patch the CLIP class before you create an instance.
+    return None
+open_clip.model._build_vision_tower = dummy_build_vision_tower
 def build_text_model_from_openai_state_dict(
         state_dict: dict,
         cast_dtype=torch.float16,
@@ -261,6 +269,7 @@ class SUPIR_Upscale:
                 clip_g = build_text_model_from_openai_state_dict(sd, cast_dtype=dtype)
                 self.model.conditioner.embedders[1].model = clip_g
             except:
+
                 raise Exception("Failed to load second clip model from SDXL checkpoint")
         
             del sd, clip_g
