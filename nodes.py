@@ -12,13 +12,6 @@ import torch.cuda
 from .sgm.util import instantiate_from_config
 from .SUPIR.util import convert_dtype, load_state_dict
 
-from open_clip import CLIP, CLIPTextCfg
-from transformers import (
-    CLIPTextModel,
-    CLIPTokenizer,
-    CLIPTextConfig,
-
-)
 script_directory = os.path.dirname(os.path.abspath(__file__))
 
 try:
@@ -28,41 +21,6 @@ try:
     XFORMERS_IS_AVAILABLE = True
 except:
     XFORMERS_IS_AVAILABLE = False
-
-
-def build_text_model_from_openai_state_dict(
-        state_dict: dict,
-        cast_dtype=torch.float16,
-):
-
-    embed_dim = state_dict["text_projection"].shape[1]
-    context_length = state_dict["positional_embedding"].shape[0]
-    vocab_size = state_dict["token_embedding.weight"].shape[0]
-    transformer_width = state_dict["ln_final.weight"].shape[0]
-    transformer_heads = transformer_width // 64
-    transformer_layers = len(set(k.split(".")[2] for k in state_dict if k.startswith(f"transformer.resblocks")))
-
-    vision_cfg = None
-    text_cfg = CLIPTextCfg(
-        context_length=context_length,
-        vocab_size=vocab_size,
-        width=transformer_width,
-        heads=transformer_heads,
-        layers=transformer_layers,
-    )
-    model = CLIP(
-        embed_dim,
-        vision_cfg=vision_cfg,
-        text_cfg=text_cfg,
-        quick_gelu=True,  # OpenAI models were trained with QuickGELU
-        cast_dtype=cast_dtype,
-    )
-
-    model.load_state_dict(state_dict, strict=False)
-    model = model.eval()
-    for param in model.parameters():
-        param.requires_grad = False
-    return model
 
 class SUPIR_Upscale:
     upscale_methods = ["nearest-exact", "bilinear", "area", "bicubic", "lanczos"]
@@ -136,16 +94,15 @@ class SUPIR_Upscale:
                 control_scale, cfg_scale_start, control_scale_start, restoration_scale, keep_model_loaded,
                 a_prompt, n_prompt, sdxl_model, supir_model, use_tiled_vae, use_tiled_sampling=False, sampler_tile_size=128, sampler_tile_stride=64, captions="", diffusion_dtype="auto",
                 encoder_dtype="auto", batch_size=1):
+
         device = mm.get_torch_device()
         mm.unload_all_models()
-
+        
         SUPIR_MODEL_PATH = folder_paths.get_full_path("checkpoints", supir_model)
         SDXL_MODEL_PATH = folder_paths.get_full_path("checkpoints", sdxl_model)
 
         config_path = os.path.join(script_directory, "options/SUPIR_v0.yaml")
         config_path_tiled = os.path.join(script_directory, "options/SUPIR_v0_tiled.yaml")
-        clip_config_path = os.path.join(script_directory, "configs/clip_vit_config.json")
-        tokenizer_path = os.path.join(script_directory, "configs/tokenizer")
 
         custom_config = {
             'sdxl_model': sdxl_model,
@@ -215,11 +172,9 @@ class SUPIR_Upscale:
             config.model.params.diffusion_dtype = model_dtype
 
             self.model = instantiate_from_config(config.model).cpu()
-
             try:
                 print(f'Attempting to load SUPIR model: [{SUPIR_MODEL_PATH}]')
                 supir_state_dict = load_state_dict(SUPIR_MODEL_PATH)
-                
             except:
                 raise Exception("Failed to load SUPIR model")
             try:
@@ -230,43 +185,11 @@ class SUPIR_Upscale:
             self.model.load_state_dict(supir_state_dict, strict=False)
             self.model.load_state_dict(sdxl_state_dict, strict=False)
 
-            del supir_state_dict
-
-            #first clip model from SDXL checkpoint
-            try:
-                print("Loading first clip model from SDXL checkpoint")
-                
-                replace_prefix = {}
-                replace_prefix["conditioner.embedders.0.transformer."] = ""
-    
-                sd = comfy.utils.state_dict_prefix_replace(sdxl_state_dict, replace_prefix, filter_keys=False)
-                clip_text_config = CLIPTextConfig.from_pretrained(clip_config_path)
-                self.model.conditioner.embedders[0].tokenizer = CLIPTokenizer.from_pretrained(tokenizer_path)
-                self.model.conditioner.embedders[0].transformer = CLIPTextModel(clip_text_config)
-                self.model.conditioner.embedders[0].transformer.load_state_dict(sd, strict=False)
-                self.model.conditioner.embedders[0].eval()
-                for param in self.model.conditioner.embedders[0].parameters():
-                    param.requires_grad = False
-            except:
-                raise Exception("Failed to load first clip model from SDXL checkpoint")
-            
-            del sdxl_state_dict
-
-            #second clip model from SDXL checkpoint
-            try:
-                print("Loading second clip model from SDXL checkpoint")
-                replace_prefix2 = {}
-                replace_prefix2["conditioner.embedders.1.model."] = ""
-                sd = comfy.utils.state_dict_prefix_replace(sd, replace_prefix2, filter_keys=True)                
-                clip_g = build_text_model_from_openai_state_dict(sd, cast_dtype=dtype)
-                self.model.conditioner.embedders[1].model = clip_g
-            except:
-                raise Exception("Failed to load second clip model from SDXL checkpoint")
-        
-            del sd, clip_g
+            del supir_state_dict, sdxl_state_dict
             mm.soft_empty_cache()
 
             try:
+                # to dtype first then to device to reduce memory usage
                 self.model.to(dtype)
                 self.model.to(device)
             except Exception as e:
@@ -286,9 +209,9 @@ class SUPIR_Upscale:
         B, H, W, C = image.shape
         new_height = H // 64 * 64
         new_width = W // 64 * 64
-        image = image.permute(0, 3, 1, 2).contiguous()
+        image = image.permute(0, 3, 1, 2).contiguous().to(device)
         resized_image = F.interpolate(image, size=(new_height, new_width), mode='bicubic', align_corners=False)
-        resized_image = resized_image.to(device)
+
         captions_list = []
         captions_list.append(captions)
         print("captions: ", captions_list)
@@ -337,10 +260,10 @@ class SUPIR_Upscale:
             out_stacked = torch.cat(out, dim=0).cpu().to(torch.float32).permute(0, 2, 3, 1)
         else:
             out_stacked = torch.stack(out, dim=0).cpu().to(torch.float32).permute(0, 2, 3, 1)
-            
         final_image, = ImageScale.upscale(self, out_stacked, "lanczos", W, H, crop="disabled")
 
         return (final_image,)
+
 
 NODE_CLASS_MAPPINGS = {
     "SUPIR_Upscale": SUPIR_Upscale
