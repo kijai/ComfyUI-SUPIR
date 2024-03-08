@@ -27,8 +27,6 @@ Memory requirements are directly related to the input image resolution, the "sca
 
 Mirror for the models: https://huggingface.co/camenduru/SUPIR/tree/main
 
-## WARNING: currently downloads 10GB clip model as I didn't figure out a way to use existing ones yet
-
 # Tests
 Video upscale test (currently the node does frames one by one from input batch):
 
