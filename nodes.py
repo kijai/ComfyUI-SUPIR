@@ -12,10 +12,7 @@ from nodes import ImageScale
 import torch.cuda
 from .sgm.util import instantiate_from_config
 from .SUPIR.util import convert_dtype, load_state_dict
-from typing import Optional
-import numpy as np
 import open_clip
-from open_clip import CLIP, CLIPTextCfg
 
 from transformers import (
     CLIPTextModel,
@@ -38,6 +35,7 @@ def dummy_build_vision_tower(*args, **kwargs):
     # Monkey patch the CLIP class before you create an instance.
     return None
 open_clip.model._build_vision_tower = dummy_build_vision_tower
+
 def build_text_model_from_openai_state_dict(
         state_dict: dict,
         cast_dtype=torch.float16,
@@ -51,14 +49,14 @@ def build_text_model_from_openai_state_dict(
     transformer_layers = len(set(k.split(".")[2] for k in state_dict if k.startswith(f"transformer.resblocks")))
 
     vision_cfg = None
-    text_cfg = CLIPTextCfg(
+    text_cfg = open_clip.CLIPTextCfg(
         context_length=context_length,
         vocab_size=vocab_size,
         width=transformer_width,
         heads=transformer_heads,
         layers=transformer_layers,
     )
-    model = CLIP(
+    model = open_clip.CLIP(
         embed_dim,
         vision_cfg=vision_cfg,
         text_cfg=text_cfg,
