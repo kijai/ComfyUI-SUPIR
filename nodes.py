@@ -175,7 +175,8 @@ class SUPIR_Upscale:
             'use_tiled_vae': use_tiled_vae,
             'supir_model': supir_model,
             'use_tiled_sampling': use_tiled_sampling,
-            'fp8_unet': fp8_unet
+            'fp8_unet': fp8_unet,
+            'fp8_vae': fp8_vae
         }
 
         if diffusion_dtype == 'auto':
