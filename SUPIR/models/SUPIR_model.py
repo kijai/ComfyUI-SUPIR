@@ -126,13 +126,21 @@ class SUPIRModel(DiffusionEngine):
             seed = random.randint(0, 65535)
         seed_everything(seed)
 
+        
+        self.model.to('cpu')
+        self.conditioner.to('cpu')
+
+        # stage 1: encode/decode/encode
+        self.first_stage_model.to(device)
         _z = self.encode_first_stage_with_denoise(x, use_sample=False)
-
         x_stage1 = self.decode_first_stage(_z)
-
         z_stage1 = self.encode_first_stage(x_stage1)
+        self.first_stage_model.to('cpu')
 
+        #conditioning
+        self.conditioner.to(device)
         c, uc = self.prepare_condition(_z, p, p_p, n_p, N)
+        self.conditioner.to('cpu')
 
         denoiser = lambda input, sigma, c, control_scale: self.denoiser(
             self.model, input, sigma, c, control_scale, **kwargs
@@ -140,9 +148,21 @@ class SUPIRModel(DiffusionEngine):
 
         noised_z = torch.randn_like(_z).to(_z.device)
 
+        comfy.model_management.soft_empty_cache()
+
+        #sampling
+        self.model.diffusion_model.to(device)
+        self.model.control_model.to(device)
         _samples = self.sampler(denoiser, noised_z, cond=c, uc=uc, x_center=z_stage1, control_scale=control_scale,
                                 use_linear_control_scale=use_linear_control_scale, control_scale_start=control_scale_start)
+        self.model.diffusion_model.to('cpu')
+        self.model.control_model.to('cpu')
+        
+        #decoding
+        self.first_stage_model.to(device)
         samples = self.decode_first_stage(_samples)
+        self.first_stage_model.to('cpu')
+        
         if color_fix_type == 'Wavelet':
             samples = wavelet_reconstruction(samples, x_stage1)
         elif color_fix_type == 'AdaIn':

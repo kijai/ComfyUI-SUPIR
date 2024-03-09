@@ -13,6 +13,7 @@ import torch.cuda
 from .sgm.util import instantiate_from_config
 from .SUPIR.util import convert_dtype, load_state_dict
 import open_clip
+from contextlib import contextmanager
 
 from transformers import (
     CLIPTextModel,
@@ -34,12 +35,21 @@ except:
 def dummy_build_vision_tower(*args, **kwargs):
     # Monkey patch the CLIP class before you create an instance.
     return None
-open_clip.model._build_vision_tower = dummy_build_vision_tower
+
+@contextmanager
+def patch_build_vision_tower():
+    original_build_vision_tower = open_clip.model._build_vision_tower
+    open_clip.model._build_vision_tower = dummy_build_vision_tower
+
+    try:
+        yield
+    finally:
+        open_clip.model._build_vision_tower = original_build_vision_tower
 
 def build_text_model_from_openai_state_dict(
         state_dict: dict,
         cast_dtype=torch.float16,
-):
+    ):
 
     embed_dim = state_dict["text_projection"].shape[1]
     context_length = state_dict["positional_embedding"].shape[0]
@@ -56,13 +66,15 @@ def build_text_model_from_openai_state_dict(
         heads=transformer_heads,
         layers=transformer_layers,
     )
-    model = open_clip.CLIP(
-        embed_dim,
-        vision_cfg=vision_cfg,
-        text_cfg=text_cfg,
-        quick_gelu=True,  # OpenAI models were trained with QuickGELU
-        cast_dtype=cast_dtype,
-    )
+
+    with patch_build_vision_tower():
+        model = open_clip.CLIP(
+            embed_dim,
+            vision_cfg=vision_cfg,
+            text_cfg=text_cfg,
+            quick_gelu=True,
+            cast_dtype=cast_dtype,
+        )
 
     model.load_state_dict(state_dict, strict=False)
     model = model.eval()
@@ -267,7 +279,6 @@ class SUPIR_Upscale:
                 clip_g = build_text_model_from_openai_state_dict(sd, cast_dtype=dtype)
                 self.model.conditioner.embedders[1].model = clip_g
             except:
-
                 raise Exception("Failed to load second clip model from SDXL checkpoint")
         
             del sd, clip_g
