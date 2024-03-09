@@ -121,6 +121,7 @@ class SUPIR_Upscale:
                 "captions": ("STRING", {"forceInput": True, "multiline": False, "default": "", }),
                 "diffusion_dtype": (
                     [
+                        'float8_e4m3fn',
                         'fp16',
                         'bf16',
                         'fp32',
@@ -140,6 +141,8 @@ class SUPIR_Upscale:
                 "use_tiled_sampling": ("BOOLEAN", {"default": False}),
                 "sampler_tile_size": ("INT", {"default": 1024, "min": 64, "max": 4096, "step": 32}),
                 "sampler_tile_stride": ("INT", {"default": 512, "min": 32, "max": 2048, "step": 32}),
+                "fp8_unet": ("BOOLEAN", {"default": False}),
+                "fp8_vae": ("BOOLEAN", {"default": False}),
             }
         }
 
@@ -153,7 +156,7 @@ class SUPIR_Upscale:
                 encoder_tile_size_pixels, decoder_tile_size_latent,
                 control_scale, cfg_scale_start, control_scale_start, restoration_scale, keep_model_loaded,
                 a_prompt, n_prompt, sdxl_model, supir_model, use_tiled_vae, use_tiled_sampling=False, sampler_tile_size=128, sampler_tile_stride=64, captions="", diffusion_dtype="auto",
-                encoder_dtype="auto", batch_size=1):
+                encoder_dtype="auto", batch_size=1, fp8_unet=False, fp8_vae=False):
         device = mm.get_torch_device()
         mm.unload_all_models()
 
@@ -172,6 +175,7 @@ class SUPIR_Upscale:
             'use_tiled_vae': use_tiled_vae,
             'supir_model': supir_model,
             'use_tiled_sampling': use_tiled_sampling,
+            'fp8_unet': fp8_unet
         }
 
         if diffusion_dtype == 'auto':
@@ -286,6 +290,10 @@ class SUPIR_Upscale:
 
             try:
                 self.model.to(dtype)
+                if fp8_unet:
+                    self.model.model.to(torch.float8_e4m3fn)
+                if fp8_vae:
+                    self.model.first_stage_model.to(torch.float8_e4m3fn)
                 self.model.to(device)
             except Exception as e:
                 print("Failed to move model to device")

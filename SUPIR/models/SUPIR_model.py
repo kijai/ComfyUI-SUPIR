@@ -7,6 +7,7 @@ import random
 from ...SUPIR.utils.colorfix import wavelet_reconstruction, adaptive_instance_normalization
 from pytorch_lightning import seed_everything
 from ...SUPIR.utils.tilevae import VAEHook
+from ...SUPIR.util import convert_dtype
 from contextlib import nullcontext
 import comfy.model_management
 
@@ -20,23 +21,8 @@ class SUPIRModel(DiffusionEngine):
         self.first_stage_model.denoise_encoder = copy.deepcopy(self.first_stage_model.encoder)
         self.sampler_config = kwargs['sampler_config']
 
-        assert (ae_dtype in ['fp32', 'fp16', 'bf16']) and (diffusion_dtype in ['fp32', 'fp16', 'bf16'])
-        if ae_dtype == 'fp32':
-            ae_dtype = torch.float32
-        elif ae_dtype == 'fp16':
-            raise RuntimeError('fp16 cause NaN in AE')
-        elif ae_dtype == 'bf16':
-            ae_dtype = torch.bfloat16
-
-        if diffusion_dtype == 'fp32':
-            diffusion_dtype = torch.float32
-        elif diffusion_dtype == 'fp16':
-            diffusion_dtype = torch.float16
-        elif diffusion_dtype == 'bf16':
-            diffusion_dtype = torch.bfloat16
-
-        self.ae_dtype = ae_dtype
-        self.model.dtype = diffusion_dtype
+        self.ae_dtype = convert_dtype(ae_dtype)
+        self.model.dtype = convert_dtype(diffusion_dtype)
 
         self.p_p = p_p
         self.n_p = n_p
@@ -72,7 +58,6 @@ class SUPIRModel(DiffusionEngine):
     @torch.no_grad()
     def decode_first_stage(self, z):
         z = 1.0 / self.scale_factor * z
-        #with torch.autocast(device, dtype=self.ae_dtype):
         autocast_condition = (self.ae_dtype == torch.float16 or self.ae_dtype == torch.bfloat16) and not comfy.model_management.is_device_mps(device)
         with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=self.ae_dtype) if autocast_condition else nullcontext():
             out = self.first_stage_model.decode(z)
