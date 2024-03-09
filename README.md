@@ -25,6 +25,9 @@ I have not included llava in this, but you can input any captions to the node an
 
 Memory requirements are directly related to the input image resolution, the "scale_by" in the node simply scales the input, you can leave it at 1.0 and size your input with any other node as well. In my testing I was able to run 512x512 to 1024x1024 with a 10GB 3080 GPU, and other tests on 24GB GPU to up 3072x3072. System RAM requirements are also hefty, don't know numbers but I would guess under 32GB is going to have issues, tested with 64GB.
 
+## Update: 
+fp8 seems to work fine for the unet, I was able to do 512p to 2048 with under 10GB VRAM used. For the VAE it seems to cause artifacts, I recommend using tiled_vae instead.
+______
 Mirror for the models: https://huggingface.co/camenduru/SUPIR/tree/main
 
 # Tests
