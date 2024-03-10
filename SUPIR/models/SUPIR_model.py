@@ -131,14 +131,15 @@ class SUPIRModel(DiffusionEngine):
         denoiser = lambda input, sigma, c, control_scale: self.denoiser(
             self.model, input, sigma, c, control_scale, **kwargs
         )
-
         noised_z = torch.randn_like(_z).to(_z.device)
-
+        
         comfy.model_management.soft_empty_cache()
 
         #sampling
         self.model.diffusion_model.to(device)
         self.model.control_model.to(device)
+        self.denoiser.to(device)
+        
         _samples = self.sampler(denoiser, noised_z, cond=c, uc=uc, x_center=z_stage1, control_scale=control_scale,
                                 use_linear_control_scale=use_linear_control_scale, control_scale_start=control_scale_start)
         self.model.diffusion_model.to('cpu')

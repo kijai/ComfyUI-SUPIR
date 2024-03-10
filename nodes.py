@@ -1,8 +1,5 @@
 import os
 import torch
-import torch.nn as nn
-from torch.nn import functional as F
-from contextlib import nullcontext
 from omegaconf import OmegaConf
 import comfy.utils
 import comfy.model_management as mm
@@ -297,22 +294,13 @@ class SUPIR_Upscale:
             del sd, clip_g
             mm.soft_empty_cache()
 
-            try:
-                self.model.to(dtype)
-                if fp8_unet:
-                    self.model.model.to(torch.float8_e4m3fn)
-                if fp8_vae:
-                    self.model.first_stage_model.to(torch.float8_e4m3fn)
-                self.model.to(device)
-            except Exception as e:
-                print("Failed to move model to device")
-                print(e)
-                import gc
-                # unload everything and give up
-                self.model = None
-                del self.model
-                gc.collect()
-                mm.soft_empty_cache()
+            self.model.to(dtype)
+
+            #only unets and/or vae to fp8 
+            if fp8_unet:
+                self.model.model.to(torch.float8_e4m3fn)
+            if fp8_vae:
+                self.model.first_stage_model.to(torch.float8_e4m3fn)
 
             if use_tiled_vae:
                 self.model.init_tile_vae(encoder_tile_size=encoder_tile_size_pixels, decoder_tile_size=decoder_tile_size_latent)
@@ -321,9 +309,8 @@ class SUPIR_Upscale:
         B, H, W, C = image.shape
         new_height = H // 64 * 64
         new_width = W // 64 * 64
-        image = image.permute(0, 3, 1, 2).contiguous()
-        resized_image = F.interpolate(image, size=(new_height, new_width), mode='bicubic', align_corners=False)
-        resized_image = resized_image.to(device)
+        resized_image, = ImageScale.upscale(self, image, resize_method, new_width, new_height, crop="disabled")
+        resized_image = image.permute(0, 3, 1, 2).to(device)
         captions_list = []
         captions_list.append(captions)
         print("captions: ", captions_list)
@@ -357,7 +344,8 @@ class SUPIR_Upscale:
                 self.model = None
                 mm.soft_empty_cache()
                 print("It's likely that too large of an image or batch_size for SUPIR was used,"
-                      " and it has devoured all of the memory it had reserved, you may need to restart ComfyUI")
+                      " and it has devoured all of the memory it had reserved, you may need to restart ComfyUI. Make sure you are using tiled_vae, "
+                      " you can also try using fp8 for reduced memory usage if your system supports it.")
                 raise e
 
             out.append(samples.squeeze(0).cpu())
@@ -373,7 +361,7 @@ class SUPIR_Upscale:
         else:
             out_stacked = torch.stack(out, dim=0).cpu().to(torch.float32).permute(0, 2, 3, 1)
             
-        final_image, = ImageScale.upscale(self, out_stacked, "lanczos", W, H, crop="disabled")
+        final_image, = ImageScale.upscale(self, out_stacked, resize_method, W, H, crop="disabled")
 
         return (final_image,)
 
