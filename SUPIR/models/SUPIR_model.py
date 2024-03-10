@@ -105,6 +105,7 @@ class SUPIRModel(DiffusionEngine):
         self.sampler_config.params.s_noise = s_noise
         self.sampler = instantiate_from_config(self.sampler_config)
 
+        print("Sampler: ", self.sampler_config.target)
         print("sampler_config: ", self.sampler_config.params)
 
         if seed == -1:

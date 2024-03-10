@@ -143,6 +143,13 @@ class SUPIR_Upscale:
                 "sampler_tile_stride": ("INT", {"default": 512, "min": 32, "max": 2048, "step": 32}),
                 "fp8_unet": ("BOOLEAN", {"default": False}),
                 "fp8_vae": ("BOOLEAN", {"default": False}),
+                "sampler": (
+                    [
+                        'RestoreDPMPP2MSampler',
+                        'RestoreEDMSampler',
+                    ], {
+                        "default": 'RestoreEDMSampler'
+                    }),
             }
         }
 
@@ -156,7 +163,7 @@ class SUPIR_Upscale:
                 encoder_tile_size_pixels, decoder_tile_size_latent,
                 control_scale, cfg_scale_start, control_scale_start, restoration_scale, keep_model_loaded,
                 a_prompt, n_prompt, sdxl_model, supir_model, use_tiled_vae, use_tiled_sampling=False, sampler_tile_size=128, sampler_tile_stride=64, captions="", diffusion_dtype="auto",
-                encoder_dtype="auto", batch_size=1, fp8_unet=False, fp8_vae=False):
+                encoder_dtype="auto", batch_size=1, fp8_unet=False, fp8_vae=False, sampler="RestoreEDMSampler"):
         device = mm.get_torch_device()
         mm.unload_all_models()
 
@@ -176,7 +183,8 @@ class SUPIR_Upscale:
             'supir_model': supir_model,
             'use_tiled_sampling': use_tiled_sampling,
             'fp8_unet': fp8_unet,
-            'fp8_vae': fp8_vae
+            'fp8_vae': fp8_vae,
+            'sampler': sampler
         }
 
         if diffusion_dtype == 'auto':
@@ -236,7 +244,7 @@ class SUPIR_Upscale:
                 
             config.model.params.ae_dtype = vae_dtype
             config.model.params.diffusion_dtype = model_dtype
-
+            config.model.params.sampler_config.target = f".sgm.modules.diffusionmodules.sampling.{sampler}"
             self.model = instantiate_from_config(config.model).cpu()
 
             try:
