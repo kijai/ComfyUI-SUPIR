@@ -1,5 +1,6 @@
 import os
 import torch
+from torch.nn import functional as F
 from omegaconf import OmegaConf
 import comfy.utils
 import comfy.model_management as mm
@@ -310,13 +311,10 @@ class SUPIR_Upscale:
         B, H, W, C = upscaled_image.shape
         new_height = H if H % 64 == 0 else ((H // 64) + 1) * 64
         new_width = W if W % 64 == 0 else ((W // 64) + 1) * 64
-
-        if new_height > H or new_width > W:
-            resized_image, = ImageScale.upscale(self, upscaled_image, resize_method, new_width, new_height, crop="disabled")
-        else:
-            resized_image = upscaled_image
-
-        resized_image = image.permute(0, 3, 1, 2).to(device)
+        upscaled_image = upscaled_image.permute(0, 3, 1, 2)
+        resized_image = F.interpolate(upscaled_image, size=(new_height, new_width), mode='bicubic', align_corners=False)
+        resized_image = resized_image.to(device)
+        
         captions_list = []
         captions_list.append(captions)
         print("captions: ", captions_list)
