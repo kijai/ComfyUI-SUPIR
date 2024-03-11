@@ -194,18 +194,3 @@ class SUPIRModel(DiffusionEngine):
                         _c, _ = self.conditioner.get_unconditional_conditioning(batch, None)
                 c.append(_c)
         return c, uc
-
-# if __name__ == '__main__':
-#     from SUPIR.util import create_model, load_state_dict
-
-#     model = create_model('../../options/dev/SUPIR_paper_version.yaml')
-
-#     SDXL_CKPT = '/opt/data/private/AIGC_pretrain/SDXL_cache/sd_xl_base_1.0_0.9vae.safetensors'
-#     SUPIR_CKPT = '/opt/data/private/AIGC_pretrain/SUPIR_cache/SUPIR-paper.ckpt'
-#     model.load_state_dict(load_state_dict(SDXL_CKPT), strict=False)
-#     model.load_state_dict(load_state_dict(SUPIR_CKPT), strict=False)
-#     model = model.cuda()
-
-#     x = torch.randn(1, 3, 512, 512).cuda()
-#     p = ['a professional, detailed, high-quality photo']
-#     samples = model.batchify_sample(x, p, num_steps=50, restoration_scale=4.0, s_churn=0, cfg_scale=4.0, seed=-1, num_samples=1)
