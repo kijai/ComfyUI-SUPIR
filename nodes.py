@@ -306,11 +306,16 @@ class SUPIR_Upscale:
             if use_tiled_vae:
                 self.model.init_tile_vae(encoder_tile_size=encoder_tile_size_pixels, decoder_tile_size=decoder_tile_size_latent)
         
-        image, = ImageScaleBy.upscale(self, image, resize_method, scale_by)
-        B, H, W, C = image.shape
-        new_height = H // 64 * 64
-        new_width = W // 64 * 64
-        resized_image, = ImageScale.upscale(self, image, resize_method, new_width, new_height, crop="disabled")
+        upscaled_image, = ImageScaleBy.upscale(self, image, resize_method, scale_by)
+        B, H, W, C = upscaled_image.shape
+        new_height = H if H % 64 == 0 else ((H // 64) + 1) * 64
+        new_width = W if W % 64 == 0 else ((W // 64) + 1) * 64
+
+        if new_height > H or new_width > W:
+            resized_image, = ImageScale.upscale(self, upscaled_image, resize_method, new_width, new_height, crop="disabled")
+        else:
+            resized_image = upscaled_image
+
         resized_image = image.permute(0, 3, 1, 2).to(device)
         captions_list = []
         captions_list.append(captions)
