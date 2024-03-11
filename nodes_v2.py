@@ -219,8 +219,8 @@ class SUPIR_first_stage:
             }
         }
 
-    RETURN_TYPES = ("IMAGE",)
-    RETURN_NAMES = ("image",)
+    RETURN_TYPES = ("SUPIRVAE", "IMAGE",)
+    RETURN_NAMES = ("SUPIR_VAE", "image",)
     FUNCTION = "process"
     CATEGORY = "SUPIR"
 
@@ -276,7 +276,7 @@ class SUPIR_first_stage:
 
         final_image, = ImageScale.upscale(self, out_stacked, 'lanczos', W, H, crop="disabled")
 
-        return (final_image,)
+        return (SUPIR_VAE, final_image,)
 
 class SUPIR_sample:
     upscale_methods = ["nearest-exact", "bilinear", "area", "bicubic", "lanczos"]
