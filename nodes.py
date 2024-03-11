@@ -118,7 +118,6 @@ class SUPIR_Upscale:
                 "captions": ("STRING", {"forceInput": True, "multiline": False, "default": "", }),
                 "diffusion_dtype": (
                     [
-                        'float8_e4m3fn',
                         'fp16',
                         'bf16',
                         'fp32',
