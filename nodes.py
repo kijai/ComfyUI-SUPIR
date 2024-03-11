@@ -229,9 +229,11 @@ class SUPIR_Upscale:
                 config = OmegaConf.load(config_path_tiled)
                 config.model.params.sampler_config.params.tile_size = sampler_tile_size // 8
                 config.model.params.sampler_config.params.tile_stride = sampler_tile_stride // 8
+                config.model.params.sampler_config.target = f".sgm.modules.diffusionmodules.sampling.Tiled{sampler}"
                 print("Using tiled sampling")
             else:
                 config = OmegaConf.load(config_path)
+                config.model.params.sampler_config.target = f".sgm.modules.diffusionmodules.sampling.{sampler}"
                 print("Using non-tiled sampling")
 
             if XFORMERS_IS_AVAILABLE:
@@ -241,7 +243,7 @@ class SUPIR_Upscale:
                 
             config.model.params.ae_dtype = vae_dtype
             config.model.params.diffusion_dtype = model_dtype
-            config.model.params.sampler_config.target = f".sgm.modules.diffusionmodules.sampling.{sampler}"
+            
             self.model = instantiate_from_config(config.model).cpu()
 
             try:
