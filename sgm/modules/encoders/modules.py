@@ -99,10 +99,10 @@ class GeneralConditioner(nn.Module):
                 for param in embedder.parameters():
                     param.requires_grad = False
                 embedder.eval()
-            print(
-                f"Initialized embedder #{n}: {embedder.__class__.__name__} "
-                f"with {count_params(embedder, False)} params. Trainable: {embedder.is_trainable}"
-            )
+            # print(
+            #     f"Initialized embedder #{n}: {embedder.__class__.__name__} "
+            #     f"with {count_params(embedder, False)} params. Trainable: {embedder.is_trainable}"
+            # )
 
             if "input_key" in embconfig:
                 embedder.input_key = embconfig["input_key"]

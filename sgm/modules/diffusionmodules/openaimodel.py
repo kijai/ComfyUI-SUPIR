@@ -186,13 +186,13 @@ class Downsample(nn.Module):
         self.dims = dims
         stride = 2 if dims != 3 else ((1, 2, 2) if not third_down else (2, 2, 2))
         if use_conv:
-            print(f"Building a Downsample layer with {dims} dims.")
-            print(
-                f"  --> settings are: \n in-chn: {self.channels}, out-chn: {self.out_channels}, "
-                f"kernel-size: 3, stride: {stride}, padding: {padding}"
-            )
-            if dims == 3:
-                print(f"  --> Downsampling third axis (time): {third_down}")
+            # print(f"Building a Downsample layer with {dims} dims.")
+            # print(
+            #     f"  --> settings are: \n in-chn: {self.channels}, out-chn: {self.out_channels}, "
+            #     f"kernel-size: 3, stride: {stride}, padding: {padding}"
+            # )
+            # if dims == 3:
+            #     print(f"  --> Downsampling third axis (time): {third_down}")
             self.op = conv_nd(
                 dims,
                 self.channels,

@@ -86,7 +86,6 @@ class SUPIR_encode:
         return {"required": {
             "SUPIR_VAE": ("SUPIRVAE",),
             "image": ("IMAGE",),
-            "batch_size": ("INT", {"default": 1, "min": 1, "max": 128, "step": 1}),
             "use_tiled_vae": ("BOOLEAN", {"default": True}),
             "encoder_tile_size": ("INT", {"default": 512, "min": 64, "max": 8192, "step": 64}),
             "encoder_dtype": (
@@ -105,7 +104,7 @@ class SUPIR_encode:
     FUNCTION = "encode"
     CATEGORY = "SUPIR"
 
-    def encode(self, SUPIR_VAE, image, batch_size, encoder_dtype, use_tiled_vae, encoder_tile_size):
+    def encode(self, SUPIR_VAE, image, encoder_dtype, use_tiled_vae, encoder_tile_size):
         device = mm.get_torch_device()
         mm.unload_all_models()
         if encoder_dtype == 'auto':
@@ -129,29 +128,31 @@ class SUPIR_encode:
         new_width = W // 64 * 64
         resized_image, = ImageScale.upscale(self, image, 'lanczos', new_width, new_height, crop="disabled")
         resized_image = image.permute(0, 3, 1, 2).to(device)
-        batched_images = [resized_image[i:i + batch_size] for i in
-                          range(0, len(resized_image), batch_size)]
         
         if use_tiled_vae:
             from .SUPIR.utils.tilevae import VAEHook
-            SUPIR_VAE.encoder.original_forward = SUPIR_VAE.encoder.forward
+            # Store the `original_forward` only if it hasn't been stored already
+            if not hasattr(SUPIR_VAE.encoder, 'original_forward'):
+                SUPIR_VAE.encoder.original_forward = SUPIR_VAE.encoder.forward
             SUPIR_VAE.encoder.forward = VAEHook(
                 SUPIR_VAE.encoder, encoder_tile_size, is_decoder=False, fast_decoder=False,
                 fast_encoder=False, color_fix=False, to_gpu=True)
-            SUPIR_VAE.encoder.forward = SUPIR_VAE.encoder.original_forward        
+        else:
+            # Only assign `original_forward` back if it exists
+            if hasattr(SUPIR_VAE.encoder, 'original_forward'):
+                SUPIR_VAE.encoder.forward = SUPIR_VAE.encoder.original_forward
         
         pbar = comfy.utils.ProgressBar(B)
         out = []
-        for img in batched_images:
+        for img in resized_image:
 
             SUPIR_VAE.to(dtype).to(device)
 
             autocast_condition = (dtype != torch.float32) and not comfy.model_management.is_device_mps(device)
             with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=dtype) if autocast_condition else nullcontext():
                 
-                z = SUPIR_VAE.encode(img)
+                z = SUPIR_VAE.encode(img.unsqueeze(0))
                 z = z * 0.13025
-                print("z_shape: ",z.shape)
                 out.append(z)
                 pbar.update(1)
 
@@ -159,7 +160,6 @@ class SUPIR_encode:
             out_stacked = torch.cat(out, dim=0)
         else:
             out_stacked = torch.stack(out, dim=0)
-        print("out_stacked: ", out_stacked.shape)
         return (out_stacked,)
 
 class SUPIR_decode:
@@ -167,8 +167,9 @@ class SUPIR_decode:
     def INPUT_TYPES(s):
         return {"required": {
             "SUPIR_VAE": ("SUPIRVAE",),
-            "latent": ("LATENT",),
-            "batch_size": ("INT", {"default": 1, "min": 1, "max": 128, "step": 1}),
+            "latents": ("LATENT",),
+            "use_tiled_vae": ("BOOLEAN", {"default": True}),
+            "decoder_tile_size": ("INT", {"default": 512, "min": 64, "max": 8192, "step": 64}),
             }
         }
 
@@ -177,29 +178,43 @@ class SUPIR_decode:
     FUNCTION = "decode"
     CATEGORY = "SUPIR"
 
-    def decode(self, SUPIR_VAE, latent, batch_size):
+    def decode(self, SUPIR_VAE, latents, use_tiled_vae, decoder_tile_size):
         device = mm.get_torch_device()
         mm.unload_all_models()
        
-        dtype = latent.dtype
+        dtype = latents.dtype
 
-        B, H, W, C = latent.shape
+        B, H, W, C = latents.shape
                 
         pbar = comfy.utils.ProgressBar(B)
 
         SUPIR_VAE.to(dtype).to(device)
 
-        autocast_condition = (dtype != torch.float32) and not comfy.model_management.is_device_mps(device)
-        with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=dtype) if autocast_condition else nullcontext():
-            latent = 1.0 / 0.13025 * latent
-            decoded_images = SUPIR_VAE.decode(latent).float()
+        if use_tiled_vae:
+            from .SUPIR.utils.tilevae import VAEHook
+            # Store the `original_forward` only if it hasn't been stored already
+            if not hasattr(SUPIR_VAE.decoder, 'original_forward'):
+                SUPIR_VAE.decoder.original_forward = SUPIR_VAE.decoder.forward
+            SUPIR_VAE.decoder.forward = VAEHook(
+                SUPIR_VAE.decoder, decoder_tile_size // 8, is_decoder=True, fast_decoder=False,
+                fast_encoder=False, color_fix=False, to_gpu=True)
+        else:
+            # Only assign `original_forward` back if it exists
+            if hasattr(SUPIR_VAE.decoder, 'original_forward'):
+                SUPIR_VAE.decoder.forward = SUPIR_VAE.decoder.original_forward
 
-        pbar.update(1)
+        out = []
+        for latent in latents:
+            autocast_condition = (dtype != torch.float32) and not comfy.model_management.is_device_mps(device)
+            with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=dtype) if autocast_condition else nullcontext():
+                latent = 1.0 / 0.13025 * latent
+                decoded_image = SUPIR_VAE.decode(latent.unsqueeze(0)).float()
+                out.append(decoded_image)
+                pbar.update(1)
+        
+        out_stacked = torch.cat(out, dim=0).cpu().to(torch.float32).permute(0, 2, 3, 1)
 
- 
-        out = decoded_images.cpu().to(torch.float32).permute(0, 2, 3, 1)
-
-        return (out,)
+        return (out_stacked,)
         
 class SUPIR_first_stage:
     @classmethod
@@ -207,8 +222,10 @@ class SUPIR_first_stage:
         return {"required": {
             "SUPIR_VAE": ("SUPIRVAE",),
             "image": ("IMAGE",),
-            "batch_size": ("INT", {"default": 1, "min": 1, "max": 128, "step": 1}),
-            "encoder_dtype": (
+            "use_tiled_vae": ("BOOLEAN", {"default": True}),
+            "encoder_tile_size": ("INT", {"default": 512, "min": 64, "max": 8192, "step": 64}),
+            "decoder_tile_size": ("INT", {"default": 512, "min": 64, "max": 8192, "step": 64}),
+             "encoder_dtype": (
                     [
                         'bf16',
                         'fp32',
@@ -224,7 +241,7 @@ class SUPIR_first_stage:
     FUNCTION = "process"
     CATEGORY = "SUPIR"
 
-    def process(self, SUPIR_VAE, image, batch_size, encoder_dtype):
+    def process(self, SUPIR_VAE, image, encoder_dtype, use_tiled_vae, encoder_tile_size, decoder_tile_size):
         device = mm.get_torch_device()
         mm.unload_all_models()
         if encoder_dtype == 'auto':
@@ -243,31 +260,49 @@ class SUPIR_first_stage:
 
         dtype = convert_dtype(vae_dtype)
 
+        if use_tiled_vae:
+            from .SUPIR.utils.tilevae import VAEHook
+            # Store the `original_forward` only if it hasn't been stored already
+            if not hasattr(SUPIR_VAE.encoder, 'original_forward'):
+                SUPIR_VAE.denoise_encoder.original_forward = SUPIR_VAE.denoise_encoder.forward
+                SUPIR_VAE.decoder.original_forward = SUPIR_VAE.decoder.forward
+                     
+            SUPIR_VAE.encoder.forward = VAEHook(
+                SUPIR_VAE.encoder, encoder_tile_size, is_decoder=False, fast_decoder=False,
+                fast_encoder=False, color_fix=False, to_gpu=True)
+            
+            SUPIR_VAE.decoder.forward = VAEHook(
+                SUPIR_VAE.decoder, decoder_tile_size // 8, is_decoder=True, fast_decoder=False,
+                fast_encoder=False, color_fix=False, to_gpu=True)
+        else:
+            # Only assign `original_forward` back if it exists
+            if hasattr(SUPIR_VAE.decoder, 'original_forward'):
+                SUPIR_VAE.encoder.forward = SUPIR_VAE.encoder.original_forward
+                SUPIR_VAE.decoder.forward = SUPIR_VAE.decoder.original_forward
+    
         B, H, W, C = image.shape
         new_height = H // 64 * 64
         new_width = W // 64 * 64
         resized_image, = ImageScale.upscale(self, image, 'lanczos', new_width, new_height, crop="disabled")
         resized_image = image.permute(0, 3, 1, 2).to(device)
-        batched_images = [resized_image[i:i + batch_size] for i in
-                          range(0, len(resized_image), batch_size)]
         
         pbar = comfy.utils.ProgressBar(B)
         out = []
-        for img in batched_images:
+        for img in resized_image:
 
             SUPIR_VAE.to(dtype).to(device)
 
             autocast_condition = (dtype != torch.float32) and not comfy.model_management.is_device_mps(device)
             with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=dtype) if autocast_condition else nullcontext():
                 
-                h = SUPIR_VAE.denoise_encoder(img)
+                h = SUPIR_VAE.denoise_encoder(img.unsqueeze(0))
                 moments = SUPIR_VAE.quant_conv(h)
                 posterior = DiagonalGaussianDistribution(moments)
                 z = posterior.sample()
                 decoded_images = SUPIR_VAE.decode(z).float()
 
-            out.append(decoded_images.squeeze(0).cpu())
-            pbar.update(1)
+                out.append(decoded_images.cpu())
+                pbar.update(1)
 
         if len(out[0].shape) == 4:
             out_stacked = torch.cat(out, dim=0).cpu().to(torch.float32).permute(0, 2, 3, 1)
@@ -288,28 +323,30 @@ class SUPIR_sample:
             "latents": ("LATENT",),
             "seed": ("INT", {"default": 123, "min": 0, "max": 0xffffffffffffffff, "step": 1}),
             "steps": ("INT", {"default": 45, "min": 3, "max": 4096, "step": 1}),
-            "restoration_scale": ("FLOAT", {"default": -1.0, "min": -1.0, "max": 6.0, "step": 1.0}),
             "cfg_scale_start": ("FLOAT", {"default": 4.0, "min": 0.0, "max": 9.0, "step": 0.05}),
             "cfg_scale_end": ("FLOAT", {"default": 4.0, "min": 0, "max": 20, "step": 0.01}),
             "a_prompt": ("STRING", {"multiline": True, "default": "high quality, detailed", }),
             "n_prompt": ("STRING", {"multiline": True, "default": "bad quality, blurry, messy", }),
             "s_churn": ("INT", {"default": 5, "min": 0, "max": 40, "step": 1}),
             "s_noise": ("FLOAT", {"default": 1.003, "min": 1.0, "max": 1.1, "step": 0.001}),
-            "control_scale": ("FLOAT", {"default": 1.0, "min": 0, "max": 10.0, "step": 0.05}),
-            "cfg_scale_start": ("FLOAT", {"default": 4.0, "min": 0.0, "max": 9.0, "step": 0.05}),
-            "control_scale_start": ("FLOAT", {"default": 0.0, "min": 0, "max": 1.0, "step": 0.05}),
-            "keep_model_loaded": ("BOOLEAN", {"default": True}),
+            "control_scale_start": ("FLOAT", {"default": 1.0, "min": 0, "max": 10.0, "step": 0.05}),
+            "control_scale_end": ("FLOAT", {"default": 1.0, "min": 0, "max": 10.0, "step": 0.05}),
+            "restore_cfg": ("FLOAT", {"default": -1.0, "min": -1.0, "max": 6.0, "step": 1.0}),
+            "keep_model_loaded": ("BOOLEAN", {"default": False}),
             "sampler": (
                     [
                         'RestoreDPMPP2MSampler',
                         'RestoreEDMSampler',
+                        'TiledRestoreDPMPP2MSampler',
+                        'TiledRestoreEDMSampler',
                     ], {
                         "default": 'RestoreEDMSampler'
                     }),
         },
             "optional": {
-                "captions": ("STRING", {"forceInput": True, "multiline": False, "default": "", }),                
-               
+                "captions": ("STRING", {"forceInput": True, "multiline": False, "default": "", }),
+                "sampler_tile_size": ("INT", {"default": 1024, "min": 64, "max": 4096, "step": 32}),
+                "sampler_tile_stride": ("INT", {"default": 512, "min": 32, "max": 2048, "step": 32}),
             }
         }
 
@@ -320,8 +357,8 @@ class SUPIR_sample:
     CATEGORY = "SUPIR"
 
     def sample(self, SUPIR_model, latents, steps, seed, cfg_scale_end, s_churn, s_noise,
-                control_scale, cfg_scale_start, control_scale_start, restoration_scale, keep_model_loaded,
-                a_prompt, n_prompt, sampler, captions=""):
+                cfg_scale_start, control_scale_start, control_scale_end, restore_cfg, keep_model_loaded,
+                a_prompt, n_prompt, sampler, captions="", sampler_tile_size=1024, sampler_tile_stride=512):
         
         torch.manual_seed(seed)
         device = mm.get_torch_device()
@@ -332,7 +369,7 @@ class SUPIR_sample:
             'target': f'.sgm.modules.diffusionmodules.sampling.{sampler}',
             'params': {
                 'num_steps': steps,
-                'restore_cfg': restoration_scale,
+                'restore_cfg': restore_cfg,
                 's_churn': s_churn,
                 's_noise': s_noise,
                 'discretization_config': {
@@ -347,6 +384,10 @@ class SUPIR_sample:
                 }
             }
         }
+        if 'Tiled' in sampler:
+            self.sampler_config['params']['tile_size'] = sampler_tile_size // 8
+            self.sampler_config['params']['tile_stride'] = sampler_tile_stride // 8
+
         if not hasattr (self,'sampler') or self.sampler_config != self.current_sampler_config: 
             self.sampler = instantiate_from_config(self.sampler_config)
             self.current_sampler_config = self.sampler_config
@@ -361,19 +402,17 @@ class SUPIR_sample:
         SUPIR_model.model.diffusion_model.to(device)
         SUPIR_model.model.control_model.to(device)
 
-        use_linear_control_scale = control_scale_start > 0
-        batch_size = latents.shape[0]
+        use_linear_control_scale = control_scale_start != control_scale_end
         out = []
-        pbar = comfy.utils.ProgressBar(batch_size)
-        print("batch_size: ", batch_size)
-        for i in range(batch_size):
+        pbar = comfy.utils.ProgressBar(latents.shape[0])
+        for latent in latents:
             try:
-                noised_z = torch.randn_like(latents[i].unsqueeze(0), device=latents.device)
+                noised_z = torch.randn_like(latent.unsqueeze(0), device=latent.device)
                 SUPIR_model.conditioner.to(device)
-                c, uc = SUPIR_model.prepare_condition(latents[i].unsqueeze(0), captions_list, a_prompt, n_prompt, 1)
+                c, uc = SUPIR_model.prepare_condition(latent.unsqueeze(0), captions_list, a_prompt, n_prompt, 1)
                 denoiser = lambda input, sigma, c, control_scale: SUPIR_model.denoiser(SUPIR_model.model, input, sigma, c, control_scale)
                 SUPIR_model.conditioner.to('cpu')
-                _samples = self.sampler(denoiser, noised_z, cond=c, uc=uc, x_center=latents[i].unsqueeze(0), control_scale=control_scale,
+                _samples = self.sampler(denoiser, noised_z, cond=c, uc=uc, x_center=latent.unsqueeze(0), control_scale=control_scale_end,
                                 use_linear_control_scale=use_linear_control_scale, control_scale_start=control_scale_start)
                 
 
@@ -388,10 +427,12 @@ class SUPIR_sample:
             print("_samples: ", _samples.shape)
             out.append(_samples)
             pbar.update(1)
-        if not keep_model_loaded:
-            SUPIR_model= None
-            mm.soft_empty_cache()
 
+        if not keep_model_loaded:
+            SUPIR_model.denoiser.to('cpu')
+            SUPIR_model.model.diffusion_model.to('cpu')
+            SUPIR_model.model.control_model.to('cpu')
+            mm.soft_empty_cache()
 
         if len(out[0].shape) == 4:
             out_stacked = torch.cat(out, dim=0)
