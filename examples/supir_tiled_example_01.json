@@ -1,0 +1,1248 @@
+{
+  "last_node_id": 66,
+  "last_link_id": 152,
+  "nodes": [
+    {
+      "id": 34,
+      "type": "GetNode",
+      "pos": [
+        2730,
+        80
+      ],
+      "size": {
+        "0": 210,
+        "1": 58
+      },
+      "flags": {
+        "collapsed": true
+      },
+      "order": 0,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            78
+          ]
+        }
+      ],
+      "title": "Get_DenoisedImage",
+      "properties": {},
+      "widgets_values": [
+        "DenoisedImage"
+      ],
+      "color": "#2a363b",
+      "bgcolor": "#3f5159"
+    },
+    {
+      "id": 5,
+      "type": "LoadImage",
+      "pos": [
+        -459,
+        220
+      ],
+      "size": {
+        "0": 535.6403198242188,
+        "1": 630.0825805664062
+      },
+      "flags": {},
+      "order": 1,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            32
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "oldman.jpg",
+        "image"
+      ]
+    },
+    {
+      "id": 49,
+      "type": "GetNode",
+      "pos": [
+        2485,
+        61
+      ],
+      "size": {
+        "0": 210,
+        "1": 58
+      },
+      "flags": {
+        "collapsed": true
+      },
+      "order": 2,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "SUPIRVAE",
+          "type": "SUPIRVAE",
+          "links": [
+            116
+          ]
+        }
+      ],
+      "title": "Get_SUPIR_VAE",
+      "properties": {},
+      "widgets_values": [
+        "SUPIR_VAE"
+      ],
+      "color": "#322",
+      "bgcolor": "#533"
+    },
+    {
+      "id": 36,
+      "type": "SUPIR_model_loader",
+      "pos": [
+        -376,
+        -48
+      ],
+      "size": {
+        "0": 436,
+        "1": 150
+      },
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "SUPIR_model",
+          "type": "SUPIRMODEL",
+          "links": [
+            119
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "SUPIR_VAE",
+          "type": "SUPIRVAE",
+          "links": [
+            115
+          ],
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SUPIR_model_loader"
+      },
+      "widgets_values": [
+        "SUPIR-v0Q.ckpt",
+        "SDXL/juggernautXL_v8Rundiffusion.safetensors",
+        false,
+        "auto"
+      ]
+    },
+    {
+      "id": 17,
+      "type": "ImageResize+",
+      "pos": [
+        170,
+        274
+      ],
+      "size": {
+        "0": 315,
+        "1": 218
+      },
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 32
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            136
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "width",
+          "type": "INT",
+          "links": null,
+          "shape": 3
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "links": null,
+          "shape": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ImageResize+"
+      },
+      "widgets_values": [
+        1536,
+        1536,
+        "lanczos",
+        false,
+        "always",
+        0
+      ]
+    },
+    {
+      "id": 48,
+      "type": "SetNode",
+      "pos": [
+        101,
+        20
+      ],
+      "size": {
+        "0": 210,
+        "1": 58
+      },
+      "flags": {
+        "collapsed": true
+      },
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "SUPIRVAE",
+          "type": "SUPIRVAE",
+          "link": 115
+        }
+      ],
+      "outputs": [
+        {
+          "name": "SUPIRVAE",
+          "type": "SUPIRVAE",
+          "links": [
+            135,
+            152
+          ],
+          "slot_index": 0
+        }
+      ],
+      "title": "Set_SUPIR_VAE",
+      "properties": {
+        "previousName": "SUPIR_VAE"
+      },
+      "widgets_values": [
+        "SUPIR_VAE"
+      ],
+      "color": "#322",
+      "bgcolor": "#533"
+    },
+    {
+      "id": 50,
+      "type": "SetNode",
+      "pos": [
+        96,
+        -37
+      ],
+      "size": {
+        "0": 210,
+        "1": 58
+      },
+      "flags": {
+        "collapsed": true
+      },
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "SUPIRMODEL",
+          "type": "SUPIRMODEL",
+          "link": 119
+        }
+      ],
+      "outputs": [
+        {
+          "name": "*",
+          "type": "*",
+          "links": null
+        }
+      ],
+      "title": "Set_SUPIR_Model",
+      "properties": {
+        "previousName": "SUPIR_Model"
+      },
+      "widgets_values": [
+        "SUPIR_Model"
+      ],
+      "color": "#323",
+      "bgcolor": "#535"
+    },
+    {
+      "id": 51,
+      "type": "GetNode",
+      "pos": [
+        1716,
+        51
+      ],
+      "size": {
+        "0": 210,
+        "1": 58
+      },
+      "flags": {
+        "collapsed": true
+      },
+      "order": 4,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "SUPIRMODEL",
+          "type": "SUPIRMODEL",
+          "links": [
+            120
+          ]
+        }
+      ],
+      "title": "Get_SUPIR_Model",
+      "properties": {},
+      "widgets_values": [
+        "SUPIR_Model"
+      ],
+      "color": "#323",
+      "bgcolor": "#535"
+    },
+    {
+      "id": 39,
+      "type": "PreviewImage",
+      "pos": [
+        190,
+        675
+      ],
+      "size": {
+        "0": 664.9555053710938,
+        "1": 704.6212768554688
+      },
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 130
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      }
+    },
+    {
+      "id": 46,
+      "type": "SUPIR_sample",
+      "pos": [
+        1939,
+        187
+      ],
+      "size": [
+        315,
+        454
+      ],
+      "flags": {},
+      "order": 19,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "SUPIR_model",
+          "type": "SUPIRMODEL",
+          "link": 120,
+          "slot_index": 0
+        },
+        {
+          "name": "latents",
+          "type": "LATENT",
+          "link": 148
+        },
+        {
+          "name": "positive",
+          "type": "SUPIR_cond_pos",
+          "link": 110,
+          "slot_index": 2
+        },
+        {
+          "name": "negative",
+          "type": "SUPIR_cond_neg",
+          "link": 111
+        },
+        {
+          "name": "sampler_tile_size",
+          "type": "INT",
+          "link": 146,
+          "widget": {
+            "name": "sampler_tile_size"
+          },
+          "slot_index": 4
+        },
+        {
+          "name": "sampler_tile_stride",
+          "type": "INT",
+          "link": 144,
+          "widget": {
+            "name": "sampler_tile_stride"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "links": [
+            107
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SUPIR_sample"
+      },
+      "widgets_values": [
+        123,
+        "fixed",
+        45,
+        4,
+        7.5,
+        5,
+        1.003,
+        1,
+        1,
+        -1,
+        false,
+        "TiledRestoreEDMSampler",
+        512,
+        256
+      ]
+    },
+    {
+      "id": 64,
+      "type": "Reroute",
+      "pos": [
+        1759,
+        556
+      ],
+      "size": [
+        75,
+        26
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "",
+          "type": "*",
+          "link": 143,
+          "widget": {
+            "name": "value"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "INT",
+          "links": [
+            144
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "showOutputText": false,
+        "horizontal": false
+      }
+    },
+    {
+      "id": 65,
+      "type": "Reroute",
+      "pos": [
+        1750,
+        508
+      ],
+      "size": [
+        75,
+        26
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "",
+          "type": "*",
+          "link": 145,
+          "widget": {
+            "name": "value"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "",
+          "type": "INT",
+          "links": [
+            146
+          ],
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "showOutputText": false,
+        "horizontal": false
+      }
+    },
+    {
+      "id": 41,
+      "type": "MoondreamQueryCaptions",
+      "pos": [
+        975,
+        642
+      ],
+      "size": {
+        "0": 400,
+        "1": 200
+      },
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 131
+        }
+      ],
+      "outputs": [
+        {
+          "name": "text",
+          "type": "STRING",
+          "links": [
+            132,
+            147
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "MoondreamQueryCaptions"
+      },
+      "widgets_values": [
+        "What is this?",
+        true,
+        "moondream2",
+        128
+      ]
+    },
+    {
+      "id": 66,
+      "type": "Display Any (rgthree)",
+      "pos": [
+        1438,
+        639
+      ],
+      "size": {
+        "0": 210,
+        "1": 76
+      },
+      "flags": {},
+      "order": 18,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "source",
+          "type": "*",
+          "link": 147,
+          "dir": 3
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "Display Any (rgthree)"
+      },
+      "widgets_values": [
+        "[[\"A person is depicted in this image, wearing a cap and a grey shirt. The background is blurred, and the image appears to have been digitally altered.\"], [\"A close-up image of a person's face, with a cap on top of their head. The background is blurred, and the image appears to have been taken in a dark setting.\"], [\"A person is depicted in this image, wearing a cap and a grey dress. The background is blurred, and the image appears to have been taken in a dark setting.\"], [\"A person is depicted in this image, wearing a cap and a black jacket. The background features water, hills, and a sky.\"], [\"A close-up image of a person's face, with a beard and mustache, is presented. The individual is wearing a cap on their head.\"], [\"A person is depicted in this image, wearing a black shirt and a beard. The background is blurred, and the image appears to have been taken in a dark setting.\"], [\"A close-up image of a person's neck and face, featuring a beard and mustache, is presented. The background is blurred, drawing focus to the person's features.\"], [\"A close-up image of a person's face, featuring a beard and mustache, is presented. The background is black, and the image is slightly blurry.\"], [\"A person is depicted in this image, wearing a black jacket and a white shirt. The individual has a beard and is partially obscured. The background is dark.\"]]"
+      ]
+    },
+    {
+      "id": 32,
+      "type": "SUPIR_decode",
+      "pos": [
+        2417,
+        133
+      ],
+      "size": {
+        "0": 210,
+        "1": 102
+      },
+      "flags": {},
+      "order": 20,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "SUPIR_VAE",
+          "type": "SUPIRVAE",
+          "link": 116,
+          "slot_index": 0
+        },
+        {
+          "name": "latents",
+          "type": "LATENT",
+          "link": 107,
+          "slot_index": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            74
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SUPIR_decode"
+      },
+      "widgets_values": [
+        true,
+        512
+      ]
+    },
+    {
+      "id": 18,
+      "type": "ColorMatch",
+      "pos": [
+        2681,
+        136
+      ],
+      "size": {
+        "0": 315,
+        "1": 78
+      },
+      "flags": {},
+      "order": 21,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image_ref",
+          "type": "IMAGE",
+          "link": 78,
+          "slot_index": 0
+        },
+        {
+          "name": "image_target",
+          "type": "IMAGE",
+          "link": 74
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "links": [
+            61
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "ColorMatch"
+      },
+      "widgets_values": [
+        "mkl"
+      ]
+    },
+    {
+      "id": 52,
+      "type": "GetNode",
+      "pos": [
+        1186,
+        266
+      ],
+      "size": {
+        "0": 210,
+        "1": 58
+      },
+      "flags": {
+        "collapsed": true
+      },
+      "order": 5,
+      "mode": 0,
+      "outputs": [
+        {
+          "name": "SUPIRMODEL",
+          "type": "SUPIRMODEL",
+          "links": [
+            121
+          ]
+        }
+      ],
+      "title": "Get_SUPIR_Model",
+      "properties": {},
+      "widgets_values": [
+        "SUPIR_Model"
+      ],
+      "color": "#323",
+      "bgcolor": "#535"
+    },
+    {
+      "id": 47,
+      "type": "SUPIR_conditioner",
+      "pos": [
+        1423,
+        288
+      ],
+      "size": [
+        343.97009033203176,
+        190.46001342773445
+      ],
+      "flags": {},
+      "order": 17,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "SUPIR_model",
+          "type": "SUPIRMODEL",
+          "link": 121,
+          "slot_index": 0
+        },
+        {
+          "name": "latents",
+          "type": "LATENT",
+          "link": 149,
+          "slot_index": 1
+        },
+        {
+          "name": "captions",
+          "type": "STRING",
+          "link": 132,
+          "widget": {
+            "name": "captions"
+          }
+        }
+      ],
+      "outputs": [
+        {
+          "name": "SUPIR_cond_pos",
+          "type": "SUPIR_cond_pos",
+          "links": [
+            110
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "SUPIR_cond_neg",
+          "type": "SUPIR_cond_neg",
+          "links": [
+            111
+          ],
+          "shape": 3,
+          "slot_index": 1
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SUPIR_conditioner"
+      },
+      "widgets_values": [
+        "high quality, detailed, photograph",
+        "bad quality, blurry, drawing, illustration",
+        ""
+      ]
+    },
+    {
+      "id": 62,
+      "type": "SUPIR_first_stage",
+      "pos": [
+        549,
+        283
+      ],
+      "size": {
+        "0": 330,
+        "1": 170
+      },
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "SUPIR_VAE",
+          "type": "SUPIRVAE",
+          "link": 135,
+          "slot_index": 0
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 136,
+          "slot_index": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "SUPIR_VAE",
+          "type": "SUPIRVAE",
+          "links": [],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "denoised_image",
+          "type": "IMAGE",
+          "links": [
+            141,
+            150
+          ],
+          "shape": 3,
+          "slot_index": 1
+        },
+        {
+          "name": "denoised_latents",
+          "type": "LATENT",
+          "links": [
+            149
+          ],
+          "shape": 3,
+          "slot_index": 2
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SUPIR_first_stage"
+      },
+      "widgets_values": [
+        true,
+        512,
+        512,
+        "auto"
+      ]
+    },
+    {
+      "id": 10,
+      "type": "SUPIR_encode",
+      "pos": [
+        1130,
+        38
+      ],
+      "size": {
+        "0": 302.6999816894531,
+        "1": 126
+      },
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "SUPIR_VAE",
+          "type": "SUPIRVAE",
+          "link": 152,
+          "slot_index": 0
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 151,
+          "slot_index": 1
+        }
+      ],
+      "outputs": [
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "links": [
+            148
+          ],
+          "shape": 3,
+          "slot_index": 0
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SUPIR_encode"
+      },
+      "widgets_values": [
+        true,
+        512,
+        "auto"
+      ]
+    },
+    {
+      "id": 33,
+      "type": "SetNode",
+      "pos": [
+        896,
+        141
+      ],
+      "size": {
+        "0": 210,
+        "1": 58
+      },
+      "flags": {
+        "collapsed": true
+      },
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "link": 150
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            151
+          ]
+        }
+      ],
+      "title": "Set_DenoisedImage",
+      "properties": {
+        "previousName": "DenoisedImage"
+      },
+      "widgets_values": [
+        "DenoisedImage"
+      ],
+      "color": "#2a363b",
+      "bgcolor": "#3f5159"
+    },
+    {
+      "id": 6,
+      "type": "PreviewImage",
+      "pos": [
+        2315,
+        337
+      ],
+      "size": {
+        "0": 926.3069458007812,
+        "1": 969.8832397460938
+      },
+      "flags": {},
+      "order": 22,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 61
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "PreviewImage"
+      }
+    },
+    {
+      "id": 58,
+      "type": "SUPIR_tiles",
+      "pos": [
+        558,
+        504
+      ],
+      "size": {
+        "0": 315,
+        "1": 122
+      },
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 141
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image_tiles",
+          "type": "IMAGE",
+          "links": [
+            130,
+            131
+          ],
+          "shape": 3,
+          "slot_index": 0
+        },
+        {
+          "name": "tile_size",
+          "type": "INT",
+          "links": [
+            145
+          ],
+          "shape": 3
+        },
+        {
+          "name": "tile_stride",
+          "type": "INT",
+          "links": [
+            143
+          ],
+          "shape": 3,
+          "slot_index": 2
+        }
+      ],
+      "properties": {
+        "Node name for S&R": "SUPIR_tiles"
+      },
+      "widgets_values": [
+        768,
+        384
+      ]
+    }
+  ],
+  "links": [
+    [
+      32,
+      5,
+      0,
+      17,
+      0,
+      "IMAGE"
+    ],
+    [
+      61,
+      18,
+      0,
+      6,
+      0,
+      "IMAGE"
+    ],
+    [
+      74,
+      32,
+      0,
+      18,
+      1,
+      "IMAGE"
+    ],
+    [
+      78,
+      34,
+      0,
+      18,
+      0,
+      "IMAGE"
+    ],
+    [
+      107,
+      46,
+      0,
+      32,
+      1,
+      "LATENT"
+    ],
+    [
+      110,
+      47,
+      0,
+      46,
+      2,
+      "SUPIR_cond_pos"
+    ],
+    [
+      111,
+      47,
+      1,
+      46,
+      3,
+      "SUPIR_cond_neg"
+    ],
+    [
+      115,
+      36,
+      1,
+      48,
+      0,
+      "*"
+    ],
+    [
+      116,
+      49,
+      0,
+      32,
+      0,
+      "SUPIRVAE"
+    ],
+    [
+      119,
+      36,
+      0,
+      50,
+      0,
+      "*"
+    ],
+    [
+      120,
+      51,
+      0,
+      46,
+      0,
+      "SUPIRMODEL"
+    ],
+    [
+      121,
+      52,
+      0,
+      47,
+      0,
+      "SUPIRMODEL"
+    ],
+    [
+      130,
+      58,
+      0,
+      39,
+      0,
+      "IMAGE"
+    ],
+    [
+      131,
+      58,
+      0,
+      41,
+      0,
+      "IMAGE"
+    ],
+    [
+      132,
+      41,
+      0,
+      47,
+      2,
+      "STRING"
+    ],
+    [
+      135,
+      48,
+      0,
+      62,
+      0,
+      "SUPIRVAE"
+    ],
+    [
+      136,
+      17,
+      0,
+      62,
+      1,
+      "IMAGE"
+    ],
+    [
+      141,
+      62,
+      1,
+      58,
+      0,
+      "IMAGE"
+    ],
+    [
+      143,
+      58,
+      2,
+      64,
+      0,
+      "*"
+    ],
+    [
+      144,
+      64,
+      0,
+      46,
+      5,
+      "INT"
+    ],
+    [
+      145,
+      58,
+      1,
+      65,
+      0,
+      "*"
+    ],
+    [
+      146,
+      65,
+      0,
+      46,
+      4,
+      "INT"
+    ],
+    [
+      147,
+      41,
+      0,
+      66,
+      0,
+      "*"
+    ],
+    [
+      148,
+      10,
+      0,
+      46,
+      1,
+      "LATENT"
+    ],
+    [
+      149,
+      62,
+      2,
+      47,
+      1,
+      "LATENT"
+    ],
+    [
+      150,
+      62,
+      1,
+      33,
+      0,
+      "IMAGE"
+    ],
+    [
+      151,
+      33,
+      0,
+      10,
+      1,
+      "IMAGE"
+    ],
+    [
+      152,
+      48,
+      0,
+      10,
+      0,
+      "SUPIRVAE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {},
+  "version": 0.4
+}

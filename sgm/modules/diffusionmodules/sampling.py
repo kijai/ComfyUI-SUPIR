@@ -664,12 +664,15 @@ class TiledRestoreDPMPP2MSampler(RestoreDPMPP2MSampler):
         use_local_prompt = isinstance(cond, list)
         b, _, h, w = x.shape
         latent_tiles_iterator = _sliding_windows(h, w, self.tile_size, self.tile_stride)
+        print(f"Image divided into {len(latent_tiles_iterator)} tiles")
+        print("Conds received: ", len(cond))
         tile_weights = self.tile_weights.repeat(b, 1, 1, 1)
         if not use_local_prompt:
             LQ_latent = cond['control']
         else:
             assert len(cond) == len(latent_tiles_iterator), "Number of local prompts should be equal to number of tiles"
             LQ_latent = cond[0]['control']
+            print("LQ_latent shape: ",LQ_latent.shape)
         x, s_in, sigmas, num_sigmas, cond, uc = self.prepare_sampling_loop(
             x, cond, uc, num_steps
         )
@@ -680,6 +683,7 @@ class TiledRestoreDPMPP2MSampler(RestoreDPMPP2MSampler):
         noise_sampler = BrownianTreeNoiseSampler(x, sigmas_min, sigmas_max)
 
         old_denoised = None
+        pbar_comfy = comfy.utils.ProgressBar(num_sigmas)
         for _idx, i in enumerate(self.get_sigma_gen(num_sigmas)):
             if i > 0 and torch.sum(s_in * sigmas[i + 1]) > 1e-14:
                 eps_noise = noise_sampler(s_in * sigmas[i], s_in * sigmas[i + 1])
@@ -720,4 +724,5 @@ class TiledRestoreDPMPP2MSampler(RestoreDPMPP2MSampler):
             x_next /= count
             x = x_next
             old_denoised = old_denoised_next
+            pbar_comfy.update(1)
         return x

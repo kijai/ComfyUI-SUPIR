@@ -225,7 +225,7 @@ class SUPIR_first_stage:
             "use_tiled_vae": ("BOOLEAN", {"default": True}),
             "encoder_tile_size": ("INT", {"default": 512, "min": 64, "max": 8192, "step": 64}),
             "decoder_tile_size": ("INT", {"default": 512, "min": 64, "max": 8192, "step": 64}),
-             "encoder_dtype": (
+            "encoder_dtype": (
                     [
                         'bf16',
                         'fp32',
@@ -236,8 +236,8 @@ class SUPIR_first_stage:
             }
         }
 
-    RETURN_TYPES = ("SUPIRVAE", "IMAGE",)
-    RETURN_NAMES = ("SUPIR_VAE", "image",)
+    RETURN_TYPES = ("SUPIRVAE", "IMAGE", "LATENT",)
+    RETURN_NAMES = ("SUPIR_VAE", "denoised_image", "denoised_latents",)
     FUNCTION = "process"
     CATEGORY = "SUPIR"
 
@@ -267,8 +267,8 @@ class SUPIR_first_stage:
                 SUPIR_VAE.denoise_encoder.original_forward = SUPIR_VAE.denoise_encoder.forward
                 SUPIR_VAE.decoder.original_forward = SUPIR_VAE.decoder.forward
                      
-            SUPIR_VAE.encoder.forward = VAEHook(
-                SUPIR_VAE.encoder, encoder_tile_size, is_decoder=False, fast_decoder=False,
+            SUPIR_VAE.denoise_encoder.forward = VAEHook(
+                SUPIR_VAE.denoise_encoder, encoder_tile_size, is_decoder=False, fast_decoder=False,
                 fast_encoder=False, color_fix=False, to_gpu=True)
             
             SUPIR_VAE.decoder.forward = VAEHook(
@@ -288,6 +288,7 @@ class SUPIR_first_stage:
         
         pbar = comfy.utils.ProgressBar(B)
         out = []
+        out_samples = []
         for img in resized_image:
 
             SUPIR_VAE.to(dtype).to(device)
@@ -298,40 +299,39 @@ class SUPIR_first_stage:
                 h = SUPIR_VAE.denoise_encoder(img.unsqueeze(0))
                 moments = SUPIR_VAE.quant_conv(h)
                 posterior = DiagonalGaussianDistribution(moments)
-                z = posterior.sample()
-                decoded_images = SUPIR_VAE.decode(z).float()
+                sample = posterior.sample()
+                decoded_images = SUPIR_VAE.decode(sample).float()
 
                 out.append(decoded_images.cpu())
+                out_samples.append(sample.cpu() * 0.13025)
                 pbar.update(1)
 
-        if len(out[0].shape) == 4:
-            out_stacked = torch.cat(out, dim=0).cpu().to(torch.float32).permute(0, 2, 3, 1)
-        else:
-            out_stacked = torch.stack(out, dim=0).cpu().to(torch.float32).permute(0, 2, 3, 1)
+
+        out_stacked = torch.cat(out, dim=0).to(torch.float32).permute(0, 2, 3, 1)
+        out_samples_stacked = torch.cat(out_samples, dim=0)
 
         final_image, = ImageScale.upscale(self, out_stacked, 'lanczos', W, H, crop="disabled")
 
-        return (SUPIR_VAE, final_image,)
+        return (SUPIR_VAE, final_image, out_samples_stacked,)
 
 class SUPIR_sample:
-    upscale_methods = ["nearest-exact", "bilinear", "area", "bicubic", "lanczos"]
 
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {
             "SUPIR_model": ("SUPIRMODEL",),
             "latents": ("LATENT",),
+            "positive": ("SUPIR_cond_pos",),
+            "negative": ("SUPIR_cond_neg",),
             "seed": ("INT", {"default": 123, "min": 0, "max": 0xffffffffffffffff, "step": 1}),
             "steps": ("INT", {"default": 45, "min": 3, "max": 4096, "step": 1}),
             "cfg_scale_start": ("FLOAT", {"default": 4.0, "min": 0.0, "max": 9.0, "step": 0.05}),
             "cfg_scale_end": ("FLOAT", {"default": 4.0, "min": 0, "max": 20, "step": 0.01}),
-            "a_prompt": ("STRING", {"multiline": True, "default": "high quality, detailed", }),
-            "n_prompt": ("STRING", {"multiline": True, "default": "bad quality, blurry, messy", }),
             "s_churn": ("INT", {"default": 5, "min": 0, "max": 40, "step": 1}),
             "s_noise": ("FLOAT", {"default": 1.003, "min": 1.0, "max": 1.1, "step": 0.001}),
             "control_scale_start": ("FLOAT", {"default": 1.0, "min": 0, "max": 10.0, "step": 0.05}),
             "control_scale_end": ("FLOAT", {"default": 1.0, "min": 0, "max": 10.0, "step": 0.05}),
-            "restore_cfg": ("FLOAT", {"default": -1.0, "min": -1.0, "max": 6.0, "step": 1.0}),
+            "restore_cfg": ("FLOAT", {"default": -1.0, "min": -1.0, "max": 6.0, "step": 0.05}),
             "keep_model_loaded": ("BOOLEAN", {"default": False}),
             "sampler": (
                     [
@@ -344,7 +344,6 @@ class SUPIR_sample:
                     }),
         },
             "optional": {
-                "captions": ("STRING", {"forceInput": True, "multiline": False, "default": "", }),
                 "sampler_tile_size": ("INT", {"default": 1024, "min": 64, "max": 4096, "step": 32}),
                 "sampler_tile_stride": ("INT", {"default": 512, "min": 32, "max": 2048, "step": 32}),
             }
@@ -353,12 +352,12 @@ class SUPIR_sample:
     RETURN_TYPES = ("LATENT",)
     RETURN_NAMES = ("latent",)
     FUNCTION = "sample"
-
+    DESCRIPTION="Samples using SUPIR's modified diffusion."
     CATEGORY = "SUPIR"
 
-    def sample(self, SUPIR_model, latents, steps, seed, cfg_scale_end, s_churn, s_noise,
+    def sample(self, SUPIR_model, latents, steps, seed, cfg_scale_end, s_churn, s_noise, positive, negative,
                 cfg_scale_start, control_scale_start, control_scale_end, restore_cfg, keep_model_loaded,
-                a_prompt, n_prompt, sampler, captions="", sampler_tile_size=1024, sampler_tile_stride=512):
+                sampler, sampler_tile_size=1024, sampler_tile_stride=512):
         
         torch.manual_seed(seed)
         device = mm.get_torch_device()
@@ -393,29 +392,26 @@ class SUPIR_sample:
             self.current_sampler_config = self.sampler_config
  
         print("sampler_config: ", self.sampler_config)
-
-        captions_list = []
-        captions_list.append(captions)
-        print("captions: ", captions_list)
         
         SUPIR_model.denoiser.to(device)
         SUPIR_model.model.diffusion_model.to(device)
         SUPIR_model.model.control_model.to(device)
 
         use_linear_control_scale = control_scale_start != control_scale_end
+
+        denoiser = lambda input, sigma, c, control_scale: SUPIR_model.denoiser(SUPIR_model.model, input, sigma, c, control_scale)
+
+        if len(positive) == 1:
+            positive = positive[0]
+
         out = []
         pbar = comfy.utils.ProgressBar(latents.shape[0])
-        for latent in latents:
+        for i, latent in enumerate(latents):
             try:
-                noised_z = torch.randn_like(latent.unsqueeze(0), device=latent.device)
-                SUPIR_model.conditioner.to(device)
-                c, uc = SUPIR_model.prepare_condition(latent.unsqueeze(0), captions_list, a_prompt, n_prompt, 1)
-                denoiser = lambda input, sigma, c, control_scale: SUPIR_model.denoiser(SUPIR_model.model, input, sigma, c, control_scale)
-                SUPIR_model.conditioner.to('cpu')
-                _samples = self.sampler(denoiser, noised_z, cond=c, uc=uc, x_center=latent.unsqueeze(0), control_scale=control_scale_end,
+                noised_z = torch.randn_like(latent.unsqueeze(0), device=latents.device)
+                _samples = self.sampler(denoiser, noised_z, cond=positive, uc=negative, x_center=latent.unsqueeze(0), control_scale=control_scale_end,
                                 use_linear_control_scale=use_linear_control_scale, control_scale_start=control_scale_start)
                 
-
             except torch.cuda.OutOfMemoryError as e:
                 mm.free_memory(mm.get_total_memory(mm.get_torch_device()), mm.get_torch_device())
                 SUPIR_model = None
@@ -442,6 +438,77 @@ class SUPIR_sample:
         print("out_stacked: ", _samples.shape)    
         return (out_stacked,)
 
+class SUPIR_conditioner:
+
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "SUPIR_model": ("SUPIRMODEL",),
+            "latents": ("LATENT",),
+            "positive_prompt": ("STRING", {"multiline": True, "default": "high quality, detailed", }),
+            "negative_prompt": ("STRING", {"multiline": True, "default": "bad quality, blurry, messy", }),
+        },
+            "optional": {
+                "captions": ("STRING", {"forceInput": True, "multiline": False, "default": "", }),
+            }
+        }
+
+    RETURN_TYPES = ("SUPIR_cond_pos", "SUPIR_cond_neg",)
+    RETURN_NAMES = ("positive", "negative",)
+    FUNCTION = "condition"
+
+    CATEGORY = "SUPIR"
+
+    def condition(self, SUPIR_model, latents, positive_prompt, negative_prompt, captions=""):
+        
+        device = mm.get_torch_device()
+        mm.unload_all_models()
+        mm.soft_empty_cache()
+
+        N, H, W, C = latents.shape
+        import copy
+
+        if not isinstance(captions, list):
+            captions_list = []
+            captions_list.append([captions])
+            captions_list = captions_list * N
+        else:
+            captions_list = captions
+
+        print("captions: ", captions_list)
+      
+        SUPIR_model.conditioner.to(device)
+        latents = latents.to(device)
+        c = []
+        uc = []
+        pbar = comfy.utils.ProgressBar(N)
+        autocast_condition = (SUPIR_model.model.dtype != torch.float32) and not comfy.model_management.is_device_mps(device)
+        with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=SUPIR_model.model.dtype) if autocast_condition else nullcontext():
+            for i, caption in enumerate(captions_list):
+                cond = {}
+                cond['original_size_as_tuple'] = torch.tensor([[1024, 1024]]).to(device)
+                cond['crop_coords_top_left'] = torch.tensor([[0, 0]]).to(device)
+                cond['target_size_as_tuple'] = torch.tensor([[1024, 1024]]).to(device)
+                cond['aesthetic_score'] = torch.tensor([[9.0]]).to(device)
+                cond['control'] = latents[0].unsqueeze(0)
+
+                uncond = copy.deepcopy(cond)
+                uncond['txt'] = [negative_prompt]
+                
+                cond['txt'] = [''.join([caption[0], positive_prompt])]
+                if i == 0:
+                    _c, uc = SUPIR_model.conditioner.get_unconditional_conditioning(cond, uncond)
+                else:
+                    _c, _ = SUPIR_model.conditioner.get_unconditional_conditioning(cond, None)
+   
+                c.append(_c)                
+                pbar.update(1)
+            
+
+        SUPIR_model.conditioner.to('cpu')
+                
+        return (c, uc,)
+    
 class SUPIR_model_loader:
     @classmethod
     def INPUT_TYPES(s):
@@ -588,17 +655,71 @@ class SUPIR_model_loader:
 
         return (self.model, self.model.first_stage_model,)
 
+class SUPIR_tiles:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "image": ("IMAGE",),
+            "tile_size": ("INT", {"default": 512, "min": 64, "max": 8192, "step": 64}),
+            "tile_stride": ("INT", {"default": 256, "min": 64, "max": 8192, "step": 64}),
+          
+            }
+        }
+
+    RETURN_TYPES = ("IMAGE", "INT", "INT",)
+    RETURN_NAMES = ("image_tiles", "tile_size", "tile_stride",)
+    FUNCTION = "tile"
+    CATEGORY = "SUPIR"
+
+    def tile(self, image, tile_size, tile_stride):
+
+        def _sliding_windows(h: int, w: int, tile_size: int, tile_stride: int):
+            hi_list = list(range(0, h - tile_size + 1, tile_stride))
+            if (h - tile_size) % tile_stride != 0:
+                hi_list.append(h - tile_size)
+
+            wi_list = list(range(0, w - tile_size + 1, tile_stride))
+            if (w - tile_size) % tile_stride != 0:
+                wi_list.append(w - tile_size)
+
+            coords = []
+            for hi in hi_list:
+                for wi in wi_list:
+                    coords.append((hi, hi + tile_size, wi, wi + tile_size))
+            return coords
+
+        image = image.permute(0, 3, 1, 2)
+        _, _, h, w = image.shape
+
+        tiles_iterator = _sliding_windows(h, w, tile_size, tile_stride)
+
+        tiles = []
+        for hi, hi_end, wi, wi_end in tiles_iterator:
+            tile = image[:, :, hi:hi_end, wi:wi_end]
+            
+            tiles.append(tile)
+        out = torch.cat(tiles, dim=0).to(torch.float32).permute(0, 2, 3, 1)
+        print(out.shape)
+        print("len(tiles): ", len(tiles))
+        
+        return (out, tile_size, tile_stride,)
+
+
 NODE_CLASS_MAPPINGS = {
     "SUPIR_sample": SUPIR_sample,
     "SUPIR_model_loader": SUPIR_model_loader,
     "SUPIR_first_stage": SUPIR_first_stage,
     "SUPIR_encode": SUPIR_encode,
-    "SUPIR_decode": SUPIR_decode
+    "SUPIR_decode": SUPIR_decode,
+    "SUPIR_conditioner": SUPIR_conditioner,
+    "SUPIR_tiles": SUPIR_tiles
 }
 NODE_DISPLAY_NAME_MAPPINGS = {
     "SUPIR_sample": "SUPIR Sampler",
     "SUPIR_model_loader": "SUPIR Model Loader",
-    "SUPIR_first_stage": "SUPIR First Stage",
+    "SUPIR_first_stage": "SUPIR First Stage (Denoiser)",
     "SUPIR_encode": "SUPIR Encode",
-    "SUPIR_decode": "SUPIR Decode"
+    "SUPIR_decode": "SUPIR Decode",
+    "SUPIR_conditioner": "SUPIR Conditioner",
+    "SUPIR_tiles": "SUPIR Tiles"
 }
