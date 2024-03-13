@@ -327,11 +327,11 @@ class SUPIR_sample:
             "steps": ("INT", {"default": 45, "min": 3, "max": 4096, "step": 1}),
             "cfg_scale_start": ("FLOAT", {"default": 4.0, "min": 0.0, "max": 9.0, "step": 0.05}),
             "cfg_scale_end": ("FLOAT", {"default": 4.0, "min": 0, "max": 20, "step": 0.01}),
-            "s_churn": ("INT", {"default": 5, "min": 0, "max": 40, "step": 1}),
+            "EDM_s_churn": ("INT", {"default": 5, "min": 0, "max": 40, "step": 1}),
             "s_noise": ("FLOAT", {"default": 1.003, "min": 1.0, "max": 1.1, "step": 0.001}),
             "control_scale_start": ("FLOAT", {"default": 1.0, "min": 0, "max": 10.0, "step": 0.05}),
             "control_scale_end": ("FLOAT", {"default": 1.0, "min": 0, "max": 10.0, "step": 0.05}),
-            "restore_cfg": ("FLOAT", {"default": -1.0, "min": -1.0, "max": 6.0, "step": 0.05}),
+            "restore_cfg": ("FLOAT", {"default": -1.0, "min": -1.0, "max": 20.0, "step": 0.05}),
             "keep_model_loaded": ("BOOLEAN", {"default": False}),
             "sampler": (
                     [
@@ -339,6 +339,7 @@ class SUPIR_sample:
                         'RestoreEDMSampler',
                         'TiledRestoreDPMPP2MSampler',
                         'TiledRestoreEDMSampler',
+                        'EulerAncestralSampler'
                     ], {
                         "default": 'RestoreEDMSampler'
                     }),
@@ -355,7 +356,7 @@ class SUPIR_sample:
     DESCRIPTION="Samples using SUPIR's modified diffusion."
     CATEGORY = "SUPIR"
 
-    def sample(self, SUPIR_model, latents, steps, seed, cfg_scale_end, s_churn, s_noise, positive, negative,
+    def sample(self, SUPIR_model, latents, steps, seed, cfg_scale_end, EDM_s_churn, s_noise, positive, negative,
                 cfg_scale_start, control_scale_start, control_scale_end, restore_cfg, keep_model_loaded,
                 sampler, sampler_tile_size=1024, sampler_tile_stride=512):
         
@@ -369,7 +370,7 @@ class SUPIR_sample:
             'params': {
                 'num_steps': steps,
                 'restore_cfg': restore_cfg,
-                's_churn': s_churn,
+                's_churn': EDM_s_churn,
                 's_noise': s_noise,
                 'discretization_config': {
                     'target': '.sgm.modules.diffusionmodules.discretizer.LegacyDDPMDiscretization'
