@@ -7,7 +7,6 @@ import random
 from ...SUPIR.utils.colorfix import wavelet_reconstruction, adaptive_instance_normalization
 from pytorch_lightning import seed_everything
 from ...SUPIR.utils.tilevae import VAEHook
-from ...SUPIR.util import convert_dtype
 from contextlib import nullcontext
 import comfy.model_management
 
@@ -21,8 +20,23 @@ class SUPIRModel(DiffusionEngine):
         self.first_stage_model.denoise_encoder = copy.deepcopy(self.first_stage_model.encoder)
         self.sampler_config = kwargs['sampler_config']
 
-        self.ae_dtype = convert_dtype(ae_dtype)
-        self.model.dtype = convert_dtype(diffusion_dtype)
+        assert (ae_dtype in ['fp32', 'fp16', 'bf16']) and (diffusion_dtype in ['fp32', 'fp16', 'bf16'])
+        if ae_dtype == 'fp32':
+            ae_dtype = torch.float32
+        elif ae_dtype == 'fp16':
+            raise RuntimeError('fp16 cause NaN in AE')
+        elif ae_dtype == 'bf16':
+            ae_dtype = torch.bfloat16
+
+        if diffusion_dtype == 'fp32':
+            diffusion_dtype = torch.float32
+        elif diffusion_dtype == 'fp16':
+            diffusion_dtype = torch.float16
+        elif diffusion_dtype == 'bf16':
+            diffusion_dtype = torch.bfloat16
+
+        self.ae_dtype = ae_dtype
+        self.model.dtype = diffusion_dtype
 
         self.p_p = p_p
         self.n_p = n_p
@@ -58,6 +72,7 @@ class SUPIRModel(DiffusionEngine):
     @torch.no_grad()
     def decode_first_stage(self, z):
         z = 1.0 / self.scale_factor * z
+        #with torch.autocast(device, dtype=self.ae_dtype):
         autocast_condition = (self.ae_dtype == torch.float16 or self.ae_dtype == torch.bfloat16) and not comfy.model_management.is_device_mps(device)
         with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=self.ae_dtype) if autocast_condition else nullcontext():
             out = self.first_stage_model.decode(z)
@@ -105,51 +120,29 @@ class SUPIRModel(DiffusionEngine):
         self.sampler_config.params.s_noise = s_noise
         self.sampler = instantiate_from_config(self.sampler_config)
 
-        print("Sampler: ", self.sampler_config.target)
         print("sampler_config: ", self.sampler_config.params)
 
         if seed == -1:
             seed = random.randint(0, 65535)
         seed_everything(seed)
 
-        
-        self.model.to('cpu')
-        self.conditioner.to('cpu')
-
-        # stage 1: encode/decode/encode
-        self.first_stage_model.to(device)
         _z = self.encode_first_stage_with_denoise(x, use_sample=False)
-        x_stage1 = self.decode_first_stage(_z)
-        z_stage1 = self.encode_first_stage(x_stage1)
-        self.first_stage_model.to('cpu')
 
-        #conditioning
-        self.conditioner.to(device)
+        x_stage1 = self.decode_first_stage(_z)
+
+        z_stage1 = self.encode_first_stage(x_stage1)
+
         c, uc = self.prepare_condition(_z, p, p_p, n_p, N)
-        self.conditioner.to('cpu')
 
         denoiser = lambda input, sigma, c, control_scale: self.denoiser(
             self.model, input, sigma, c, control_scale, **kwargs
         )
-        noised_z = torch.randn_like(_z).to(_z.device)
-        
-        comfy.model_management.soft_empty_cache()
 
-        #sampling
-        self.model.diffusion_model.to(device)
-        self.model.control_model.to(device)
-        self.denoiser.to(device)
-        
+        noised_z = torch.randn_like(_z).to(_z.device)
+
         _samples = self.sampler(denoiser, noised_z, cond=c, uc=uc, x_center=z_stage1, control_scale=control_scale,
                                 use_linear_control_scale=use_linear_control_scale, control_scale_start=control_scale_start)
-        self.model.diffusion_model.to('cpu')
-        self.model.control_model.to('cpu')
-        
-        #decoding
-        self.first_stage_model.to(device)
         samples = self.decode_first_stage(_samples)
-        self.first_stage_model.to('cpu')
-        
         if color_fix_type == 'Wavelet':
             samples = wavelet_reconstruction(samples, x_stage1)
         elif color_fix_type == 'AdaIn':

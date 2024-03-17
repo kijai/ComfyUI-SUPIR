@@ -1,8 +1,6 @@
 import os
 import torch
-import torch.nn as nn
 from torch.nn import functional as F
-from contextlib import nullcontext
 from omegaconf import OmegaConf
 import comfy.utils
 import comfy.model_management as mm
@@ -13,6 +11,7 @@ import torch.cuda
 from .sgm.util import instantiate_from_config
 from .SUPIR.util import convert_dtype, load_state_dict
 import open_clip
+from contextlib import contextmanager
 
 from transformers import (
     CLIPTextModel,
@@ -34,12 +33,21 @@ except:
 def dummy_build_vision_tower(*args, **kwargs):
     # Monkey patch the CLIP class before you create an instance.
     return None
-open_clip.model._build_vision_tower = dummy_build_vision_tower
+
+@contextmanager
+def patch_build_vision_tower():
+    original_build_vision_tower = open_clip.model._build_vision_tower
+    open_clip.model._build_vision_tower = dummy_build_vision_tower
+
+    try:
+        yield
+    finally:
+        open_clip.model._build_vision_tower = original_build_vision_tower
 
 def build_text_model_from_openai_state_dict(
         state_dict: dict,
         cast_dtype=torch.float16,
-):
+    ):
 
     embed_dim = state_dict["text_projection"].shape[1]
     context_length = state_dict["positional_embedding"].shape[0]
@@ -56,13 +64,15 @@ def build_text_model_from_openai_state_dict(
         heads=transformer_heads,
         layers=transformer_layers,
     )
-    model = open_clip.CLIP(
-        embed_dim,
-        vision_cfg=vision_cfg,
-        text_cfg=text_cfg,
-        quick_gelu=True,  # OpenAI models were trained with QuickGELU
-        cast_dtype=cast_dtype,
-    )
+
+    with patch_build_vision_tower():
+        model = open_clip.CLIP(
+            embed_dim,
+            vision_cfg=vision_cfg,
+            text_cfg=text_cfg,
+            quick_gelu=True,
+            cast_dtype=cast_dtype,
+        )
 
     model.load_state_dict(state_dict, strict=False)
     model = model.eval()
@@ -128,6 +138,15 @@ class SUPIR_Upscale:
                 "use_tiled_sampling": ("BOOLEAN", {"default": False}),
                 "sampler_tile_size": ("INT", {"default": 1024, "min": 64, "max": 4096, "step": 32}),
                 "sampler_tile_stride": ("INT", {"default": 512, "min": 32, "max": 2048, "step": 32}),
+                "fp8_unet": ("BOOLEAN", {"default": False}),
+                "fp8_vae": ("BOOLEAN", {"default": False}),
+                "sampler": (
+                    [
+                        'RestoreDPMPP2MSampler',
+                        'RestoreEDMSampler',
+                    ], {
+                        "default": 'RestoreEDMSampler'
+                    }),
             }
         }
 
@@ -141,7 +160,7 @@ class SUPIR_Upscale:
                 encoder_tile_size_pixels, decoder_tile_size_latent,
                 control_scale, cfg_scale_start, control_scale_start, restoration_scale, keep_model_loaded,
                 a_prompt, n_prompt, sdxl_model, supir_model, use_tiled_vae, use_tiled_sampling=False, sampler_tile_size=128, sampler_tile_stride=64, captions="", diffusion_dtype="auto",
-                encoder_dtype="auto", batch_size=1):
+                encoder_dtype="auto", batch_size=1, fp8_unet=False, fp8_vae=False, sampler="RestoreEDMSampler"):
         device = mm.get_torch_device()
         mm.unload_all_models()
 
@@ -160,6 +179,9 @@ class SUPIR_Upscale:
             'use_tiled_vae': use_tiled_vae,
             'supir_model': supir_model,
             'use_tiled_sampling': use_tiled_sampling,
+            'fp8_unet': fp8_unet,
+            'fp8_vae': fp8_vae,
+            'sampler': sampler
         }
 
         if diffusion_dtype == 'auto':
@@ -207,9 +229,11 @@ class SUPIR_Upscale:
                 config = OmegaConf.load(config_path_tiled)
                 config.model.params.sampler_config.params.tile_size = sampler_tile_size // 8
                 config.model.params.sampler_config.params.tile_stride = sampler_tile_stride // 8
+                config.model.params.sampler_config.target = f".sgm.modules.diffusionmodules.sampling.Tiled{sampler}"
                 print("Using tiled sampling")
             else:
                 config = OmegaConf.load(config_path)
+                config.model.params.sampler_config.target = f".sgm.modules.diffusionmodules.sampling.{sampler}"
                 print("Using non-tiled sampling")
 
             if XFORMERS_IS_AVAILABLE:
@@ -219,7 +243,7 @@ class SUPIR_Upscale:
                 
             config.model.params.ae_dtype = vae_dtype
             config.model.params.diffusion_dtype = model_dtype
-
+            
             self.model = instantiate_from_config(config.model).cpu()
 
             try:
@@ -267,35 +291,30 @@ class SUPIR_Upscale:
                 clip_g = build_text_model_from_openai_state_dict(sd, cast_dtype=dtype)
                 self.model.conditioner.embedders[1].model = clip_g
             except:
-
                 raise Exception("Failed to load second clip model from SDXL checkpoint")
         
             del sd, clip_g
             mm.soft_empty_cache()
 
-            try:
-                self.model.to(dtype)
-                self.model.to(device)
-            except Exception as e:
-                print("Failed to move model to device")
-                print(e)
-                import gc
-                # unload everything and give up
-                self.model = None
-                del self.model
-                gc.collect()
-                mm.soft_empty_cache()
+            self.model.to(dtype)
+
+            #only unets and/or vae to fp8 
+            if fp8_unet:
+                self.model.model.to(torch.float8_e4m3fn)
+            if fp8_vae:
+                self.model.first_stage_model.to(torch.float8_e4m3fn)
 
             if use_tiled_vae:
                 self.model.init_tile_vae(encoder_tile_size=encoder_tile_size_pixels, decoder_tile_size=decoder_tile_size_latent)
         
-        image, = ImageScaleBy.upscale(self, image, resize_method, scale_by)
-        B, H, W, C = image.shape
-        new_height = H // 64 * 64
-        new_width = W // 64 * 64
-        image = image.permute(0, 3, 1, 2).contiguous()
-        resized_image = F.interpolate(image, size=(new_height, new_width), mode='bicubic', align_corners=False)
+        upscaled_image, = ImageScaleBy.upscale(self, image, resize_method, scale_by)
+        B, H, W, C = upscaled_image.shape
+        new_height = H if H % 64 == 0 else ((H // 64) + 1) * 64
+        new_width = W if W % 64 == 0 else ((W // 64) + 1) * 64
+        upscaled_image = upscaled_image.permute(0, 3, 1, 2)
+        resized_image = F.interpolate(upscaled_image, size=(new_height, new_width), mode='bicubic', align_corners=False)
         resized_image = resized_image.to(device)
+        
         captions_list = []
         captions_list.append(captions)
         print("captions: ", captions_list)
@@ -329,7 +348,8 @@ class SUPIR_Upscale:
                 self.model = None
                 mm.soft_empty_cache()
                 print("It's likely that too large of an image or batch_size for SUPIR was used,"
-                      " and it has devoured all of the memory it had reserved, you may need to restart ComfyUI")
+                      " and it has devoured all of the memory it had reserved, you may need to restart ComfyUI. Make sure you are using tiled_vae, "
+                      " you can also try using fp8 for reduced memory usage if your system supports it.")
                 raise e
 
             out.append(samples.squeeze(0).cpu())
@@ -345,7 +365,7 @@ class SUPIR_Upscale:
         else:
             out_stacked = torch.stack(out, dim=0).cpu().to(torch.float32).permute(0, 2, 3, 1)
             
-        final_image, = ImageScale.upscale(self, out_stacked, "lanczos", W, H, crop="disabled")
+        final_image, = ImageScale.upscale(self, out_stacked, resize_method, W, H, crop="disabled")
 
         return (final_image,)
 

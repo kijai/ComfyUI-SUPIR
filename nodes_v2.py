@@ -329,6 +329,7 @@ class SUPIR_sample:
             "cfg_scale_end": ("FLOAT", {"default": 4.0, "min": 0, "max": 20, "step": 0.01}),
             "EDM_s_churn": ("INT", {"default": 5, "min": 0, "max": 40, "step": 1}),
             "s_noise": ("FLOAT", {"default": 1.003, "min": 1.0, "max": 1.1, "step": 0.001}),
+            "eta": ("FLOAT", {"default": 1.0, "min": 0, "max": 10.0, "step": 0.01}),
             "control_scale_start": ("FLOAT", {"default": 1.0, "min": 0, "max": 10.0, "step": 0.05}),
             "control_scale_end": ("FLOAT", {"default": 1.0, "min": 0, "max": 10.0, "step": 0.05}),
             "restore_cfg": ("FLOAT", {"default": -1.0, "min": -1.0, "max": 20.0, "step": 0.05}),
@@ -357,7 +358,7 @@ class SUPIR_sample:
     CATEGORY = "SUPIR"
 
     def sample(self, SUPIR_model, latents, steps, seed, cfg_scale_end, EDM_s_churn, s_noise, positive, negative,
-                cfg_scale_start, control_scale_start, control_scale_end, restore_cfg, keep_model_loaded,
+                cfg_scale_start, control_scale_start, control_scale_end, restore_cfg, keep_model_loaded, eta,
                 sampler, sampler_tile_size=1024, sampler_tile_stride=512):
         
         torch.manual_seed(seed)
@@ -372,6 +373,7 @@ class SUPIR_sample:
                 'restore_cfg': restore_cfg,
                 's_churn': EDM_s_churn,
                 's_noise': s_noise,
+                'eta': eta,
                 'discretization_config': {
                     'target': '.sgm.modules.diffusionmodules.discretizer.LegacyDDPMDiscretization'
                 },
@@ -588,7 +590,7 @@ class SUPIR_model_loader:
                 config.model.params.first_stage_config.params.ddconfig.attn_type = "vanilla-xformers" 
                 
             config.model.params.diffusion_dtype = model_dtype
-
+            config.model.target = ".SUPIR.models.SUPIR_model_v2.SUPIRModel"
             pbar = comfy.utils.ProgressBar(7)
 
             self.model = instantiate_from_config(config.model).cpu()
@@ -704,23 +706,3 @@ class SUPIR_tiles:
         print("len(tiles): ", len(tiles))
         
         return (out, tile_size, tile_stride,)
-
-
-NODE_CLASS_MAPPINGS = {
-    "SUPIR_sample": SUPIR_sample,
-    "SUPIR_model_loader": SUPIR_model_loader,
-    "SUPIR_first_stage": SUPIR_first_stage,
-    "SUPIR_encode": SUPIR_encode,
-    "SUPIR_decode": SUPIR_decode,
-    "SUPIR_conditioner": SUPIR_conditioner,
-    "SUPIR_tiles": SUPIR_tiles
-}
-NODE_DISPLAY_NAME_MAPPINGS = {
-    "SUPIR_sample": "SUPIR Sampler",
-    "SUPIR_model_loader": "SUPIR Model Loader",
-    "SUPIR_first_stage": "SUPIR First Stage (Denoiser)",
-    "SUPIR_encode": "SUPIR Encode",
-    "SUPIR_decode": "SUPIR Decode",
-    "SUPIR_conditioner": "SUPIR Conditioner",
-    "SUPIR_tiles": "SUPIR Tiles"
-}
