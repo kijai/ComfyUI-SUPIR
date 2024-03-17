@@ -123,7 +123,6 @@ class SUPIR_encode:
             print(f"Encoder using using {vae_dtype}")
 
         dtype = convert_dtype(vae_dtype)
-        print("image shape before: ", image.shape)
         image = image.permute(0, 3, 1, 2)
         B, C, H, W = image.shape
         orig_H, orig_W = H, W
@@ -134,7 +133,6 @@ class SUPIR_encode:
         if orig_H % 64 != 0 or orig_W % 64 != 0:
             image = F.interpolate(image, size=(H, W), mode="bicubic")
         resized_image = image.to(device)
-        print("image shape after: ", resized_image.shape)
         
         if use_tiled_vae:
             from .SUPIR.utils.tilevae import VAEHook
@@ -286,6 +284,7 @@ class SUPIR_first_stage:
             if hasattr(SUPIR_VAE.decoder, 'original_forward'):
                 SUPIR_VAE.encoder.forward = SUPIR_VAE.encoder.original_forward
                 SUPIR_VAE.decoder.forward = SUPIR_VAE.decoder.original_forward
+
         image = image.permute(0, 3, 1, 2)
         B, C, H, W = image.shape
         orig_H, orig_W = H, W
@@ -296,7 +295,6 @@ class SUPIR_first_stage:
         if orig_H % 64 != 0 or orig_W % 64 != 0:
             image = F.interpolate(image, size=(H, W), mode="bicubic")
         resized_image = image.to(device)
-        print("image shape after: ", resized_image.shape)
         
         pbar = comfy.utils.ProgressBar(B)
         out = []
@@ -320,7 +318,6 @@ class SUPIR_first_stage:
 
 
         out_stacked = torch.cat(out, dim=0).to(torch.float32).permute(0, 2, 3, 1)
-        print("out_stacked shape: ", out_stacked.shape)
         out_samples_stacked = torch.cat(out_samples, dim=0)
 
         return (SUPIR_VAE, out_stacked, out_samples_stacked,)
@@ -433,7 +430,6 @@ class SUPIR_sample:
                       " and it has devoured all of the memory it had reserved, you may need to restart ComfyUI. Make sure you are using tiled_vae, "
                       " you can also try using fp8 for reduced memory usage if your system supports it.")
                 raise e
-            print("_samples: ", _samples.shape)
             out.append(_samples)
             pbar.update(1)
 
@@ -448,7 +444,6 @@ class SUPIR_sample:
         else:
             out_stacked = torch.stack(out, dim=0)
         
-        print("out_stacked: ", _samples.shape)    
         return (out_stacked,)
 
 class SUPIR_conditioner:
