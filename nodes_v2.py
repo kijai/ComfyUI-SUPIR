@@ -7,6 +7,7 @@ import folder_paths
 from nodes import ImageScaleBy
 from nodes import ImageScale
 import torch.cuda
+import torch.nn.functional as F
 from .sgm.util import instantiate_from_config
 from .SUPIR.util import convert_dtype, load_state_dict
 from .sgm.modules.distributions.distributions import DiagonalGaussianDistribution
@@ -122,12 +123,18 @@ class SUPIR_encode:
             print(f"Encoder using using {vae_dtype}")
 
         dtype = convert_dtype(vae_dtype)
-
-        B, H, W, C = image.shape
-        new_height = H // 64 * 64
-        new_width = W // 64 * 64
-        resized_image, = ImageScale.upscale(self, image, 'lanczos', new_width, new_height, crop="disabled")
-        resized_image = image.permute(0, 3, 1, 2).to(device)
+        print("image shape before: ", image.shape)
+        image = image.permute(0, 3, 1, 2)
+        B, C, H, W = image.shape
+        orig_H, orig_W = H, W
+        if W % 64 != 0:
+            W = W - (W % 64)
+        if H % 64 != 0:
+            H = H - (H % 64)
+        if orig_H % 64 != 0 or orig_W % 64 != 0:
+            image = F.interpolate(image, size=(H, W), mode="bicubic")
+        resized_image = image.to(device)
+        print("image shape after: ", resized_image.shape)
         
         if use_tiled_vae:
             from .SUPIR.utils.tilevae import VAEHook
@@ -279,12 +286,17 @@ class SUPIR_first_stage:
             if hasattr(SUPIR_VAE.decoder, 'original_forward'):
                 SUPIR_VAE.encoder.forward = SUPIR_VAE.encoder.original_forward
                 SUPIR_VAE.decoder.forward = SUPIR_VAE.decoder.original_forward
-    
-        B, H, W, C = image.shape
-        new_height = H // 64 * 64
-        new_width = W // 64 * 64
-        resized_image, = ImageScale.upscale(self, image, 'lanczos', new_width, new_height, crop="disabled")
-        resized_image = image.permute(0, 3, 1, 2).to(device)
+        image = image.permute(0, 3, 1, 2)
+        B, C, H, W = image.shape
+        orig_H, orig_W = H, W
+        if W % 64 != 0:
+            W = W - (W % 64)
+        if H % 64 != 0:
+            H = H - (H % 64)
+        if orig_H % 64 != 0 or orig_W % 64 != 0:
+            image = F.interpolate(image, size=(H, W), mode="bicubic")
+        resized_image = image.to(device)
+        print("image shape after: ", resized_image.shape)
         
         pbar = comfy.utils.ProgressBar(B)
         out = []
@@ -308,11 +320,10 @@ class SUPIR_first_stage:
 
 
         out_stacked = torch.cat(out, dim=0).to(torch.float32).permute(0, 2, 3, 1)
+        print("out_stacked shape: ", out_stacked.shape)
         out_samples_stacked = torch.cat(out_samples, dim=0)
 
-        final_image, = ImageScale.upscale(self, out_stacked, 'lanczos', W, H, crop="disabled")
-
-        return (SUPIR_VAE, final_image, out_samples_stacked,)
+        return (SUPIR_VAE, out_stacked, out_samples_stacked,)
 
 class SUPIR_sample:
 
