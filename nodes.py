@@ -94,13 +94,13 @@ class SUPIR_Upscale:
             "scale_by": ("FLOAT", {"default": 1.0, "min": 0.01, "max": 20.0, "step": 0.01}),
             "steps": ("INT", {"default": 45, "min": 3, "max": 4096, "step": 1}),
             "restoration_scale": ("FLOAT", {"default": -1.0, "min": -1.0, "max": 6.0, "step": 1.0}),
-            "cfg_scale": ("FLOAT", {"default": 4.0, "min": 0, "max": 20, "step": 0.01}),
+            "cfg_scale": ("FLOAT", {"default": 4.0, "min": 0, "max": 100, "step": 0.01}),
             "a_prompt": ("STRING", {"multiline": True, "default": "high quality, detailed", }),
             "n_prompt": ("STRING", {"multiline": True, "default": "bad quality, blurry, messy", }),
             "s_churn": ("INT", {"default": 5, "min": 0, "max": 40, "step": 1}),
             "s_noise": ("FLOAT", {"default": 1.003, "min": 1.0, "max": 1.1, "step": 0.001}),
             "control_scale": ("FLOAT", {"default": 1.0, "min": 0, "max": 10.0, "step": 0.05}),
-            "cfg_scale_start": ("FLOAT", {"default": 4.0, "min": 0.0, "max": 9.0, "step": 0.05}),
+            "cfg_scale_start": ("FLOAT", {"default": 4.0, "min": 0.0, "max": 100.0, "step": 0.05}),
             "control_scale_start": ("FLOAT", {"default": 0.0, "min": 0, "max": 1.0, "step": 0.05}),
             "color_fix_type": (
                 [

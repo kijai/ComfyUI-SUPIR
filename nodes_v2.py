@@ -281,8 +281,8 @@ class SUPIR_first_stage:
                 fast_encoder=False, color_fix=False, to_gpu=True)
         else:
             # Only assign `original_forward` back if it exists
-            if hasattr(SUPIR_VAE.decoder, 'original_forward'):
-                SUPIR_VAE.encoder.forward = SUPIR_VAE.encoder.original_forward
+            if hasattr(SUPIR_VAE.denoise_encoder, 'original_forward'):
+                SUPIR_VAE.denoise_encoder.forward = SUPIR_VAE.denoise_encoder.original_forward
                 SUPIR_VAE.decoder.forward = SUPIR_VAE.decoder.original_forward
 
         image = image.permute(0, 3, 1, 2)
@@ -333,8 +333,8 @@ class SUPIR_sample:
             "negative": ("SUPIR_cond_neg",),
             "seed": ("INT", {"default": 123, "min": 0, "max": 0xffffffffffffffff, "step": 1}),
             "steps": ("INT", {"default": 45, "min": 3, "max": 4096, "step": 1}),
-            "cfg_scale_start": ("FLOAT", {"default": 4.0, "min": 0.0, "max": 9.0, "step": 0.05}),
-            "cfg_scale_end": ("FLOAT", {"default": 4.0, "min": 0, "max": 20, "step": 0.01}),
+            "cfg_scale_start": ("FLOAT", {"default": 4.0, "min": 0.0, "max": 100.0, "step": 0.01}),
+            "cfg_scale_end": ("FLOAT", {"default": 4.0, "min": 0, "max": 100.0, "step": 0.01}),
             "EDM_s_churn": ("INT", {"default": 5, "min": 0, "max": 40, "step": 1}),
             "s_noise": ("FLOAT", {"default": 1.003, "min": 1.0, "max": 1.1, "step": 0.001}),
             "DPMPP_eta": ("FLOAT", {"default": 1.0, "min": 0, "max": 10.0, "step": 0.01}),
@@ -386,8 +386,8 @@ class SUPIR_sample:
                 'guider_config': {
                     'target': '.sgm.modules.diffusionmodules.guiders.LinearCFG',
                     'params': {
-                        'scale': cfg_scale_end,
-                        'scale_min': cfg_scale_start
+                        'scale': cfg_scale_start,
+                        'scale_min': cfg_scale_end
                     }
                 }
             }
@@ -397,6 +397,7 @@ class SUPIR_sample:
             self.sampler_config['params']['tile_stride'] = sampler_tile_stride // 8
         if 'DPMPP' in sampler:
             self.sampler_config['params']['eta'] = DPMPP_eta
+            self.sampler_config['params']['restore_cfg'] = -1
         if not hasattr (self,'sampler') or self.sampler_config != self.current_sampler_config: 
             self.sampler = instantiate_from_config(self.sampler_config)
             self.current_sampler_config = self.sampler_config
@@ -418,6 +419,7 @@ class SUPIR_sample:
         pbar = comfy.utils.ProgressBar(latents.shape[0])
         for i, latent in enumerate(latents):
             try:
+                print("latent shape: ",latent.unsqueeze(0).shape)
                 noised_z = torch.randn_like(latent.unsqueeze(0), device=latents.device)
                 _samples = self.sampler(denoiser, noised_z, cond=positive, uc=negative, x_center=latent.unsqueeze(0), control_scale=control_scale_end,
                                 use_linear_control_scale=use_linear_control_scale, control_scale_start=control_scale_start)
@@ -447,7 +449,9 @@ class SUPIR_sample:
         return (out_stacked,)
 
 class SUPIR_conditioner:
-
+    @classmethod
+    def IS_CHANGED(s):
+        return ""
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {
