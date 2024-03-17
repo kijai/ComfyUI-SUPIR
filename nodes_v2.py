@@ -329,7 +329,7 @@ class SUPIR_sample:
             "cfg_scale_end": ("FLOAT", {"default": 4.0, "min": 0, "max": 20, "step": 0.01}),
             "EDM_s_churn": ("INT", {"default": 5, "min": 0, "max": 40, "step": 1}),
             "s_noise": ("FLOAT", {"default": 1.003, "min": 1.0, "max": 1.1, "step": 0.001}),
-            "eta": ("FLOAT", {"default": 1.0, "min": 0, "max": 10.0, "step": 0.01}),
+            "DPMPP_eta": ("FLOAT", {"default": 1.0, "min": 0, "max": 10.0, "step": 0.01}),
             "control_scale_start": ("FLOAT", {"default": 1.0, "min": 0, "max": 10.0, "step": 0.05}),
             "control_scale_end": ("FLOAT", {"default": 1.0, "min": 0, "max": 10.0, "step": 0.05}),
             "restore_cfg": ("FLOAT", {"default": -1.0, "min": -1.0, "max": 20.0, "step": 0.05}),
@@ -357,7 +357,7 @@ class SUPIR_sample:
     CATEGORY = "SUPIR"
 
     def sample(self, SUPIR_model, latents, steps, seed, cfg_scale_end, EDM_s_churn, s_noise, positive, negative,
-                cfg_scale_start, control_scale_start, control_scale_end, restore_cfg, keep_model_loaded, eta,
+                cfg_scale_start, control_scale_start, control_scale_end, restore_cfg, keep_model_loaded, DPMPP_eta,
                 sampler, sampler_tile_size=1024, sampler_tile_stride=512):
         
         torch.manual_seed(seed)
@@ -372,7 +372,6 @@ class SUPIR_sample:
                 'restore_cfg': restore_cfg,
                 's_churn': EDM_s_churn,
                 's_noise': s_noise,
-                'eta': eta,
                 'discretization_config': {
                     'target': '.sgm.modules.diffusionmodules.discretizer.LegacyDDPMDiscretization'
                 },
@@ -388,7 +387,8 @@ class SUPIR_sample:
         if 'Tiled' in sampler:
             self.sampler_config['params']['tile_size'] = sampler_tile_size // 8
             self.sampler_config['params']['tile_stride'] = sampler_tile_stride // 8
-
+        if 'DPMPP' in sampler:
+            self.sampler_config['params']['eta'] = DPMPP_eta
         if not hasattr (self,'sampler') or self.sampler_config != self.current_sampler_config: 
             self.sampler = instantiate_from_config(self.sampler_config)
             self.current_sampler_config = self.sampler_config
