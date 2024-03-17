@@ -9,6 +9,7 @@ import torch
 from omegaconf import ListConfig, OmegaConf
 from tqdm import tqdm
 from comfy.k_diffusion.sampling import BrownianTreeNoiseSampler, get_sigmas_karras
+from comfy.k_diffusion.sampling import BrownianTreeNoiseSampler, get_sigmas_karras
 from ...modules.diffusionmodules.sampling_utils import (
     get_ancestral_step,
     linear_multistep_coeff,
@@ -560,6 +561,9 @@ class RestoreDPMPP2MSampler(DPMPP2MSampler):
             restore_cfg_s_tmin=0.05, eta=1., *args, **kwargs):
         self.s_noise = s_noise
         self.eta = eta
+        self.restore_cfg = restore_cfg
+        self.restore_cfg_s_tmin = restore_cfg_s_tmin
+        self.sigma_max = 14.6146
         super().__init__(*args, **kwargs)
 
     def denoise(self, x, denoiser, sigma, cond, uc, control_scale=1.0):
@@ -591,9 +595,19 @@ class RestoreDPMPP2MSampler(DPMPP2MSampler):
         cond,
         uc=None,
         eps_noise=None,
+        x_center=None,
         control_scale=1.0,
+        use_linear_control_scale=False,
+        control_scale_start=0.0
     ):
+        if use_linear_control_scale:
+            control_scale = (sigma[0].item() / self.sigma_max) * (control_scale_start - control_scale) + control_scale
+
         denoised = self.denoise(x, denoiser, sigma, cond, uc, control_scale=control_scale)
+
+        if (next_sigma[0] > self.restore_cfg_s_tmin) and (self.restore_cfg > 0):
+            d_center = (denoised - x_center)
+            denoised = denoised - d_center * ((sigma.view(-1, 1, 1, 1) / self.sigma_max) ** self.restore_cfg)
 
         h, r, t, t_next = self.get_variables(sigma, next_sigma, previous_sigma)
         eta_h = self.eta * h
@@ -619,7 +633,8 @@ class RestoreDPMPP2MSampler(DPMPP2MSampler):
 
         return x, denoised
 
-    def __call__(self, denoiser, x, cond, uc=None, num_steps=None, control_scale=1.0, **kwargs):
+    def __call__(self, denoiser, x, cond, uc=None, num_steps=None, x_center=None, control_scale=1.0, 
+                 use_linear_control_scale=False, control_scale_start=0.0, **kwargs):
         x, s_in, sigmas, num_sigmas, cond, uc = self.prepare_sampling_loop(
             x, cond, uc, num_steps
         )
@@ -647,6 +662,9 @@ class RestoreDPMPP2MSampler(DPMPP2MSampler):
                 uc=uc,
                 eps_noise=eps_noise,
                 control_scale=control_scale,
+                x_center=x_center,
+                use_linear_control_scale=use_linear_control_scale,
+                control_scale_start=control_scale_start,
             )
             pbar_comfy.update(1)
 
@@ -664,12 +682,15 @@ class TiledRestoreDPMPP2MSampler(RestoreDPMPP2MSampler):
         use_local_prompt = isinstance(cond, list)
         b, _, h, w = x.shape
         latent_tiles_iterator = _sliding_windows(h, w, self.tile_size, self.tile_stride)
+        print(f"Image divided into {len(latent_tiles_iterator)} tiles")
+        print("Conds received: ", len(cond))
         tile_weights = self.tile_weights.repeat(b, 1, 1, 1)
         if not use_local_prompt:
             LQ_latent = cond['control']
         else:
             assert len(cond) == len(latent_tiles_iterator), "Number of local prompts should be equal to number of tiles"
             LQ_latent = cond[0]['control']
+            print("LQ_latent shape: ",LQ_latent.shape)
         x, s_in, sigmas, num_sigmas, cond, uc = self.prepare_sampling_loop(
             x, cond, uc, num_steps
         )
@@ -680,6 +701,7 @@ class TiledRestoreDPMPP2MSampler(RestoreDPMPP2MSampler):
         noise_sampler = BrownianTreeNoiseSampler(x, sigmas_min, sigmas_max)
 
         old_denoised = None
+        pbar_comfy = comfy.utils.ProgressBar(num_sigmas)
         for _idx, i in enumerate(self.get_sigma_gen(num_sigmas)):
             if i > 0 and torch.sum(s_in * sigmas[i + 1]) > 1e-14:
                 eps_noise = noise_sampler(s_in * sigmas[i], s_in * sigmas[i + 1])
@@ -720,4 +742,5 @@ class TiledRestoreDPMPP2MSampler(RestoreDPMPP2MSampler):
             x_next /= count
             x = x_next
             old_denoised = old_denoised_next
+            pbar_comfy.update(1)
         return x

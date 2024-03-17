@@ -564,9 +564,9 @@ class SpatialTransformer(nn.Module):
         sdp_backend=None,
     ):
         super().__init__()
-        print(
-            f"constructing {self.__class__.__name__} of depth {depth} w/ {in_channels} channels and {n_heads} heads"
-        )
+        # print(
+        #     f"constructing {self.__class__.__name__} of depth {depth} w/ {in_channels} channels and {n_heads} heads"
+        # )
         from omegaconf import ListConfig
 
         if exists(context_dim) and not isinstance(context_dim, (list, ListConfig)):
