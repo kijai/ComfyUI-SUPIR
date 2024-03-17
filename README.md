@@ -1,7 +1,16 @@
 # ComfyUI SUPIR upscaler wrapper node
 
 ## WORK IN PROGRESS
-![image](https://github.com/kijai/ComfyUI-SUPIR/assets/40791699/887898d3-afe5-45d1-be08-50f6620b70eb)
+
+# UPDATE:
+
+As I have learned a lot with this project, I have now separated the single node to multiple nodes that make more sense to use in ComfyUI, and makes it clearer how SUPIR works. This is still a wrapper, though the whole thing has deviated from the original with much wider hardware support, more efficient model loading, far less memory usage and more sampler options. Here's a quick example (workflow is included) of using a Ligntning model, quality suffers then but it's very fast and I recommend starting with it as faster sampling makes it a lot easier to learn what the settings do.
+
+Under the hood SUPIR is SDXL img2img pipeline, the biggest custom part being their ControlNet. What they call "first stage" is a denoising process using their special "denoise encoder" VAE. This is not to be confused with the Gradio demo's "first stage" that's labeled as such for the Llava preprocessing, the Gradio "Stage2" still runs the denoising process anyway. This can be fully skipped with the nodes, or replaced with any other preprocessing node such as a model upscaler or anything you want.
+
+https://github.com/kijai/ComfyUI-SUPIR/assets/40791699/5cae2a24-d425-462c-b89d-df7dcf01595c
+
+
 
 # Installing
 Either manager and install from git, or clone this repo to custom_nodes and run:
