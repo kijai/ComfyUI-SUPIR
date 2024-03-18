@@ -221,8 +221,7 @@ class SUPIR_decode:
                 pbar.update(1)
 
         decoded_out= torch.cat(out, dim=0)
-
-        if decoded_out.shape[1] != orig_H or decoded_out.shape[2] != orig_W:
+        if decoded_out.shape[2] != orig_H or decoded_out.shape[3] != orig_W:
             print("Restoring original dimensions: ", orig_W,"x",orig_H)
             decoded_out = F.interpolate(decoded_out, size=(orig_H, orig_W), mode="bicubic")
 
@@ -425,25 +424,12 @@ class SUPIR_sample:
         original_size = positive['original_size']
         positive = positive['cond']
         negative = negative['uncond']
-        print("positives: ",len(positive))
-        print("positives[0]: ",len(positive[0]))
-        print("negative: ",len(negative))
         samples = latents["samples"]
-        
-        if len(positive[0]) < 3:
-            pos=[]
-            for p in positive:
-                p = p[0]
-                pos.append(p)
-            positive = pos
             
         out = []
         pbar = comfy.utils.ProgressBar(samples.shape[0])
         for i, sample in enumerate(samples):
             try:
-                print("positive[i]: ",len(positive[i]))
-                print("negative[i]: ",len(negative[i]))
-                print("latent shape: ",sample.unsqueeze(0).shape)
                 noised_z = torch.randn_like(sample.unsqueeze(0), device=samples.device)
                 _samples = self.sampler(denoiser, noised_z, cond=positive[i], uc=negative[i], x_center=sample.unsqueeze(0), control_scale=control_scale_end,
                                 use_linear_control_scale=use_linear_control_scale, control_scale_start=control_scale_start)
@@ -457,6 +443,7 @@ class SUPIR_sample:
                       " you can also try using fp8 for reduced memory usage if your system supports it.")
                 raise e
             out.append(_samples)
+            print("Sampled ", i+1, " of ", samples.shape[0])
             pbar.update(1)
 
         if not keep_model_loaded:
@@ -522,9 +509,36 @@ class SUPIR_conditioner:
         pbar = comfy.utils.ProgressBar(N)
         autocast_condition = (SUPIR_model.model.dtype != torch.float32) and not comfy.model_management.is_device_mps(device)
         with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=SUPIR_model.model.dtype) if autocast_condition else nullcontext():
-            for sample in samples:
+            if N != len(captions_list): #Tiled captioning
+                print("Tiled captioning")
                 c = []
+                uc = []
                 for i, caption in enumerate(captions_list):
+                    cond = {}
+                    cond['original_size_as_tuple'] = torch.tensor([[1024, 1024]]).to(device)
+                    cond['crop_coords_top_left'] = torch.tensor([[0, 0]]).to(device)
+                    cond['target_size_as_tuple'] = torch.tensor([[1024, 1024]]).to(device)
+                    cond['aesthetic_score'] = torch.tensor([[9.0]]).to(device)
+                    cond['control'] = samples[0].unsqueeze(0)
+
+                    uncond = copy.deepcopy(cond)
+                    uncond['txt'] = [negative_prompt]
+                    
+                    cond['txt'] = [''.join([caption[0], positive_prompt])]
+                    if i == 0:
+                        _c, _uc = SUPIR_model.conditioner.get_unconditional_conditioning(cond, uncond)
+                    else:
+                        _c, _ = SUPIR_model.conditioner.get_unconditional_conditioning(cond, None)
+    
+                    c.append(_c)
+                    pbar.update(1)
+                uc.extend([_uc]*len(c))
+            else: #batch captioning
+                print("Batch captioning")
+                c = []
+                uc = []
+                for i, sample in enumerate(samples):
+                    
                     cond = {}
                     cond['original_size_as_tuple'] = torch.tensor([[1024, 1024]]).to(device)
                     cond['crop_coords_top_left'] = torch.tensor([[0, 0]]).to(device)
@@ -535,20 +549,17 @@ class SUPIR_conditioner:
                     uncond = copy.deepcopy(cond)
                     uncond['txt'] = [negative_prompt]
                     
-                    cond['txt'] = [''.join([caption[0], positive_prompt])]
-                    if i == 0:
-                        _c, uc = SUPIR_model.conditioner.get_unconditional_conditioning(cond, uncond)
-                    else:
-                        _c, _ = SUPIR_model.conditioner.get_unconditional_conditioning(cond, None)
-    
+                    cond['txt'] = [''.join([captions_list[i][0], positive_prompt])]
+                    _c, _uc = SUPIR_model.conditioner.get_unconditional_conditioning(cond, uncond)    
                     c.append(_c)
+                    uc.append(_uc)
+                    
                     pbar.update(1)
-                batch_conds.append(c)
-                bach_unconds.append(uc)
+
             
         SUPIR_model.conditioner.to('cpu')
                 
-        return ({"cond": batch_conds, "original_size":latents["original_size"]}, {"uncond": bach_unconds},)
+        return ({"cond": c, "original_size":latents["original_size"]}, {"uncond": uc},)
     
 class SUPIR_model_loader:
     @classmethod
