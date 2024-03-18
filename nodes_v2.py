@@ -123,16 +123,18 @@ class SUPIR_encode:
             print(f"Encoder using using {vae_dtype}")
 
         dtype = convert_dtype(vae_dtype)
+
         image = image.permute(0, 3, 1, 2)
         B, C, H, W = image.shape
+        downscale_ratio = 32
         orig_H, orig_W = H, W
-        if W % 64 != 0:
-            W = W - (W % 64)
-        if H % 64 != 0:
-            H = H - (H % 64)
-        if orig_H % 64 != 0 or orig_W % 64 != 0:
+        if W % downscale_ratio != 0:
+            W = W - (W % downscale_ratio)
+        if H % downscale_ratio != 0:
+            H = H - (H % downscale_ratio)
+        if orig_H % downscale_ratio != 0 or orig_W % downscale_ratio != 0:
             image = F.interpolate(image, size=(H, W), mode="bicubic")
-        resized_image = image.to(device)
+        resized_image = image.to(device)        
         
         if use_tiled_vae:
             from .SUPIR.utils.tilevae import VAEHook
@@ -162,10 +164,10 @@ class SUPIR_encode:
                 pbar.update(1)
 
         if len(out[0].shape) == 4:
-            out_stacked = torch.cat(out, dim=0)
+            samples_out_stacked = torch.cat(out, dim=0)
         else:
-            out_stacked = torch.stack(out, dim=0)
-        return (out_stacked,)
+            samples_out_stacked = torch.stack(out, dim=0)
+        return ({"samples":samples_out_stacked},)
 
 class SUPIR_decode:
     @classmethod
@@ -186,10 +188,11 @@ class SUPIR_decode:
     def decode(self, SUPIR_VAE, latents, use_tiled_vae, decoder_tile_size):
         device = mm.get_torch_device()
         mm.unload_all_models()
-       
-        dtype = latents.dtype
-
-        B, H, W, C = latents.shape
+        samples = latents["samples"]
+        dtype = samples.dtype
+        orig_H, orig_W = latents["original_size"]
+        
+        B, H, W, C = samples.shape
                 
         pbar = comfy.utils.ProgressBar(B)
 
@@ -209,17 +212,23 @@ class SUPIR_decode:
                 SUPIR_VAE.decoder.forward = SUPIR_VAE.decoder.original_forward
 
         out = []
-        for latent in latents:
+        for sample in samples:
             autocast_condition = (dtype != torch.float32) and not comfy.model_management.is_device_mps(device)
             with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=dtype) if autocast_condition else nullcontext():
-                latent = 1.0 / 0.13025 * latent
-                decoded_image = SUPIR_VAE.decode(latent.unsqueeze(0)).float()
+                sample = 1.0 / 0.13025 * sample
+                decoded_image = SUPIR_VAE.decode(sample.unsqueeze(0)).float()
                 out.append(decoded_image)
                 pbar.update(1)
-        
-        out_stacked = torch.cat(out, dim=0).cpu().to(torch.float32).permute(0, 2, 3, 1)
 
-        return (out_stacked,)
+        decoded_out= torch.cat(out, dim=0)
+
+        if decoded_out.shape[1] != orig_H or decoded_out.shape[2] != orig_W:
+            print("Restoring original dimensions: ", orig_W,"x",orig_H)
+            decoded_out = F.interpolate(decoded_out, size=(orig_H, orig_W), mode="bicubic")
+
+        decoded_out = decoded_out.cpu().to(torch.float32).permute(0, 2, 3, 1)
+
+        return (decoded_out,)
         
 class SUPIR_first_stage:
     @classmethod
@@ -287,12 +296,13 @@ class SUPIR_first_stage:
 
         image = image.permute(0, 3, 1, 2)
         B, C, H, W = image.shape
+        downscale_ratio = 32
         orig_H, orig_W = H, W
-        if W % 64 != 0:
-            W = W - (W % 64)
-        if H % 64 != 0:
-            H = H - (H % 64)
-        if orig_H % 64 != 0 or orig_W % 64 != 0:
+        if W % downscale_ratio != 0:
+            W = W - (W % downscale_ratio)
+        if H % downscale_ratio != 0:
+            H = H - (H % downscale_ratio)
+        if orig_H % downscale_ratio != 0 or orig_W % downscale_ratio != 0:
             image = F.interpolate(image, size=(H, W), mode="bicubic")
         resized_image = image.to(device)
         
@@ -319,8 +329,8 @@ class SUPIR_first_stage:
 
         out_stacked = torch.cat(out, dim=0).to(torch.float32).permute(0, 2, 3, 1)
         out_samples_stacked = torch.cat(out_samples, dim=0)
-
-        return (SUPIR_VAE, out_stacked, out_samples_stacked,)
+        original_size = [orig_H, orig_W]
+        return (SUPIR_VAE, out_stacked, {"samples": out_samples_stacked, "original_size": original_size},)
 
 class SUPIR_sample:
 
@@ -412,16 +422,30 @@ class SUPIR_sample:
 
         denoiser = lambda input, sigma, c, control_scale: SUPIR_model.denoiser(SUPIR_model.model, input, sigma, c, control_scale)
 
-        if len(positive) == 1:
-            positive = positive[0]
-
+        original_size = positive['original_size']
+        positive = positive['cond']
+        negative = negative['uncond']
+        print("positives: ",len(positive))
+        print("positives[0]: ",len(positive[0]))
+        print("negative: ",len(negative))
+        samples = latents["samples"]
+        
+        if len(positive[0]) < 3:
+            pos=[]
+            for p in positive:
+                p = p[0]
+                pos.append(p)
+            positive = pos
+            
         out = []
-        pbar = comfy.utils.ProgressBar(latents.shape[0])
-        for i, latent in enumerate(latents):
+        pbar = comfy.utils.ProgressBar(samples.shape[0])
+        for i, sample in enumerate(samples):
             try:
-                print("latent shape: ",latent.unsqueeze(0).shape)
-                noised_z = torch.randn_like(latent.unsqueeze(0), device=latents.device)
-                _samples = self.sampler(denoiser, noised_z, cond=positive, uc=negative, x_center=latent.unsqueeze(0), control_scale=control_scale_end,
+                print("positive[i]: ",len(positive[i]))
+                print("negative[i]: ",len(negative[i]))
+                print("latent shape: ",sample.unsqueeze(0).shape)
+                noised_z = torch.randn_like(sample.unsqueeze(0), device=samples.device)
+                _samples = self.sampler(denoiser, noised_z, cond=positive[i], uc=negative[i], x_center=sample.unsqueeze(0), control_scale=control_scale_end,
                                 use_linear_control_scale=use_linear_control_scale, control_scale_start=control_scale_start)
                 
             except torch.cuda.OutOfMemoryError as e:
@@ -442,16 +466,16 @@ class SUPIR_sample:
             mm.soft_empty_cache()
 
         if len(out[0].shape) == 4:
-            out_stacked = torch.cat(out, dim=0)
+            samples_out_stacked = torch.cat(out, dim=0)
         else:
-            out_stacked = torch.stack(out, dim=0)
-        
-        return (out_stacked,)
+            samples_out_stacked = torch.stack(out, dim=0)
+
+        return ({"samples":samples_out_stacked, "original_size": original_size},)
 
 class SUPIR_conditioner:
-    @classmethod
-    def IS_CHANGED(s):
-        return ""
+    # @classmethod
+    # def IS_CHANGED(s):
+    #     return ""
     @classmethod
     def INPUT_TYPES(s):
         return {"required": {
@@ -476,50 +500,55 @@ class SUPIR_conditioner:
         device = mm.get_torch_device()
         mm.unload_all_models()
         mm.soft_empty_cache()
-
-        N, H, W, C = latents.shape
+        samples = latents["samples"]
+        N, H, W, C = samples.shape
         import copy
 
         if not isinstance(captions, list):
             captions_list = []
             captions_list.append([captions])
-            captions_list = captions_list * N
+            #captions_list = captions_list * N
         else:
             captions_list = captions
 
         print("captions: ", captions_list)
       
         SUPIR_model.conditioner.to(device)
-        latents = latents.to(device)
-        c = []
+        samples = samples.to(device)
+
         uc = []
+        batch_conds = []
+        bach_unconds = []
         pbar = comfy.utils.ProgressBar(N)
         autocast_condition = (SUPIR_model.model.dtype != torch.float32) and not comfy.model_management.is_device_mps(device)
         with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=SUPIR_model.model.dtype) if autocast_condition else nullcontext():
-            for i, caption in enumerate(captions_list):
-                cond = {}
-                cond['original_size_as_tuple'] = torch.tensor([[1024, 1024]]).to(device)
-                cond['crop_coords_top_left'] = torch.tensor([[0, 0]]).to(device)
-                cond['target_size_as_tuple'] = torch.tensor([[1024, 1024]]).to(device)
-                cond['aesthetic_score'] = torch.tensor([[9.0]]).to(device)
-                cond['control'] = latents[0].unsqueeze(0)
+            for sample in samples:
+                c = []
+                for i, caption in enumerate(captions_list):
+                    cond = {}
+                    cond['original_size_as_tuple'] = torch.tensor([[1024, 1024]]).to(device)
+                    cond['crop_coords_top_left'] = torch.tensor([[0, 0]]).to(device)
+                    cond['target_size_as_tuple'] = torch.tensor([[1024, 1024]]).to(device)
+                    cond['aesthetic_score'] = torch.tensor([[9.0]]).to(device)
+                    cond['control'] = sample.unsqueeze(0)
 
-                uncond = copy.deepcopy(cond)
-                uncond['txt'] = [negative_prompt]
-                
-                cond['txt'] = [''.join([caption[0], positive_prompt])]
-                if i == 0:
-                    _c, uc = SUPIR_model.conditioner.get_unconditional_conditioning(cond, uncond)
-                else:
-                    _c, _ = SUPIR_model.conditioner.get_unconditional_conditioning(cond, None)
-   
-                c.append(_c)                
-                pbar.update(1)
+                    uncond = copy.deepcopy(cond)
+                    uncond['txt'] = [negative_prompt]
+                    
+                    cond['txt'] = [''.join([caption[0], positive_prompt])]
+                    if i == 0:
+                        _c, uc = SUPIR_model.conditioner.get_unconditional_conditioning(cond, uncond)
+                    else:
+                        _c, _ = SUPIR_model.conditioner.get_unconditional_conditioning(cond, None)
+    
+                    c.append(_c)
+                    pbar.update(1)
+                batch_conds.append(c)
+                bach_unconds.append(uc)
             
-
         SUPIR_model.conditioner.to('cpu')
                 
-        return (c, uc,)
+        return ({"cond": batch_conds, "original_size":latents["original_size"]}, {"uncond": bach_unconds},)
     
 class SUPIR_model_loader:
     @classmethod
