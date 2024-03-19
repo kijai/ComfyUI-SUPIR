@@ -425,14 +425,23 @@ class SUPIR_sample:
         positive = positive['cond']
         negative = negative['uncond']
         samples = latents["samples"]
-            
+        #print("positives: ", len(positive))
+        #print("negatives: ", len(negative))
         out = []
         pbar = comfy.utils.ProgressBar(samples.shape[0])
         for i, sample in enumerate(samples):
             try:
                 noised_z = torch.randn_like(sample.unsqueeze(0), device=samples.device)
-                _samples = self.sampler(denoiser, noised_z, cond=positive[i], uc=negative[i], x_center=sample.unsqueeze(0), control_scale=control_scale_end,
-                                use_linear_control_scale=use_linear_control_scale, control_scale_start=control_scale_start)
+                if len(positive) != len(samples):
+                    print("Tiled sampling")
+                    _samples = self.sampler(denoiser, noised_z, cond=positive, uc=negative, x_center=sample.unsqueeze(0), control_scale=control_scale_end,
+                                    use_linear_control_scale=use_linear_control_scale, control_scale_start=control_scale_start)
+                else:
+                    #print("positives[i]: ", len(positive[i]))
+                    #print("negatives[i]: ", len(negative[i]))
+                    _samples = self.sampler(denoiser, noised_z, cond=positive[i], uc=negative[i], x_center=sample.unsqueeze(0), control_scale=control_scale_end,
+                                            use_linear_control_scale=use_linear_control_scale, control_scale_start=control_scale_start)
+
                 
             except torch.cuda.OutOfMemoryError as e:
                 mm.free_memory(mm.get_total_memory(mm.get_torch_device()), mm.get_torch_device())
@@ -494,7 +503,7 @@ class SUPIR_conditioner:
         if not isinstance(captions, list):
             captions_list = []
             captions_list.append([captions])
-            #captions_list = captions_list * N
+            captions_list = captions_list * N
         else:
             captions_list = captions
 
@@ -504,8 +513,6 @@ class SUPIR_conditioner:
         samples = samples.to(device)
 
         uc = []
-        batch_conds = []
-        bach_unconds = []
         pbar = comfy.utils.ProgressBar(N)
         autocast_condition = (SUPIR_model.model.dtype != torch.float32) and not comfy.model_management.is_device_mps(device)
         with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=SUPIR_model.model.dtype) if autocast_condition else nullcontext():
@@ -526,13 +533,12 @@ class SUPIR_conditioner:
                     
                     cond['txt'] = [''.join([caption[0], positive_prompt])]
                     if i == 0:
-                        _c, _uc = SUPIR_model.conditioner.get_unconditional_conditioning(cond, uncond)
+                        _c, uc = SUPIR_model.conditioner.get_unconditional_conditioning(cond, uncond)
                     else:
                         _c, _ = SUPIR_model.conditioner.get_unconditional_conditioning(cond, None)
     
                     c.append(_c)
                     pbar.update(1)
-                uc.extend([_uc]*len(c))
             else: #batch captioning
                 print("Batch captioning")
                 c = []
@@ -548,7 +554,6 @@ class SUPIR_conditioner:
 
                     uncond = copy.deepcopy(cond)
                     uncond['txt'] = [negative_prompt]
-                    
                     cond['txt'] = [''.join([captions_list[i][0], positive_prompt])]
                     _c, _uc = SUPIR_model.conditioner.get_unconditional_conditioning(cond, uncond)    
                     c.append(_c)
