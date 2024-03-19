@@ -157,7 +157,7 @@ class SUPIR_encode:
 
             autocast_condition = (dtype != torch.float32) and not comfy.model_management.is_device_mps(device)
             with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=dtype) if autocast_condition else nullcontext():
-                
+
                 z = SUPIR_VAE.encode(img.unsqueeze(0))
                 z = z * 0.13025
                 out.append(z)
@@ -167,7 +167,7 @@ class SUPIR_encode:
             samples_out_stacked = torch.cat(out, dim=0)
         else:
             samples_out_stacked = torch.stack(out, dim=0)
-        return ({"samples":samples_out_stacked},)
+        return ({"samples":samples_out_stacked, "original_size": [orig_H, orig_W]},)
 
 class SUPIR_decode:
     @classmethod
