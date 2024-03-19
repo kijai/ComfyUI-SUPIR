@@ -259,6 +259,7 @@ class SUPIR_first_stage:
         mm.unload_all_models()
         if encoder_dtype == 'auto':
             try:
+                
                 if mm.should_use_bf16():
                     print("Encoder using bf16")
                     vae_dtype = 'bf16'
@@ -610,14 +611,14 @@ class SUPIR_model_loader:
 
         if diffusion_dtype == 'auto':
             try:
-                if mm.should_use_bf16():
+                if mm.should_use_fp16():
+                    print("Diffusion using fp16")
+                    dtype = torch.float16
+                    model_dtype = 'fp16'
+                elif mm.should_use_bf16():
                     print("Diffusion using bf16")
                     dtype = torch.bfloat16
                     model_dtype = 'bf16'
-                elif mm.should_use_fp16():
-                    print("Diffusion using using fp16")
-                    dtype = torch.float16
-                    model_dtype = 'fp16'
                 else:
                     print("Diffusion using using fp32")
                     dtype = torch.float32
