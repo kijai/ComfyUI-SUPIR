@@ -417,7 +417,7 @@ class SUPIR_sample:
         SUPIR_model.denoiser.to(device)
         SUPIR_model.model.diffusion_model.to(device)
         SUPIR_model.model.control_model.to(device)
-        samples = samples.to(device)
+        
         use_linear_control_scale = control_scale_start != control_scale_end
 
         denoiser = lambda input, sigma, c, control_scale: SUPIR_model.denoiser(SUPIR_model.model, input, sigma, c, control_scale)
@@ -426,6 +426,7 @@ class SUPIR_sample:
         positive = positive['cond']
         negative = negative['uncond']
         samples = latents["samples"]
+        samples = samples.to(device)
         #print("positives: ", len(positive))
         #print("negatives: ", len(negative))
         out = []
