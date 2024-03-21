@@ -584,6 +584,11 @@ class SUPIR_model_loader:
                     ], {
                         "default": 'auto'
                     }),
+            },
+            "optional":{
+                "model" :("MODEL",),
+                "clip": ("CLIP",),
+                "vae": ("VAE",),
             }
         }
 
@@ -592,7 +597,7 @@ class SUPIR_model_loader:
     FUNCTION = "process"
     CATEGORY = "SUPIR"
 
-    def process(self, supir_model, sdxl_model, diffusion_dtype, fp8_unet):
+    def process(self, supir_model, sdxl_model, diffusion_dtype, fp8_unet, model=None, clip=None, vae=None):
         device = mm.get_torch_device()
         mm.unload_all_models()
 
@@ -608,6 +613,9 @@ class SUPIR_model_loader:
             'diffusion_dtype': diffusion_dtype,
             'supir_model': supir_model,
             'fp8_unet': fp8_unet,
+            'model': model,
+            "clip": clip,
+            "vae": vae
         }
 
         if diffusion_dtype == 'auto':
@@ -658,8 +666,21 @@ class SUPIR_model_loader:
             except:
                 raise Exception("Failed to load SUPIR model")
             try:
-                print(f"Attempting to load SDXL model: [{SDXL_MODEL_PATH}]")
-                sdxl_state_dict = load_state_dict(SDXL_MODEL_PATH)
+                if model is None or clip is None or vae is None:
+                    print(f"Attempting to load SDXL model: [{SDXL_MODEL_PATH}]")
+                    sdxl_state_dict = load_state_dict(SDXL_MODEL_PATH)
+                else:
+                    assert model is not None and clip is not None and vae is not None, "Need to pass model, clip, and vae"
+                    print(f"Attempting to load SDXL model from node inputs")
+                    clip_sd = None
+                    load_models = [model]
+                    load_models.append(clip.load_model())
+                    clip_sd = clip.get_sd()
+
+                    mm.load_models_gpu(load_models)
+                
+                    sd = model.model.state_dict_for_saving(clip_sd, vae.get_sd(), None)
+                    sdxl_state_dict = sd
                 pbar.update(1)
             except:
                 raise Exception("Failed to load SDXL model")
