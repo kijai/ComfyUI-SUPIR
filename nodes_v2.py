@@ -585,11 +585,6 @@ class SUPIR_model_loader:
                         "default": 'auto'
                     }),
             },
-            "optional":{
-                "model" :("MODEL",),
-                "clip": ("CLIP",),
-                "vae": ("VAE",),
-            }
         }
 
     RETURN_TYPES = ("SUPIRMODEL", "SUPIRVAE")
@@ -597,7 +592,7 @@ class SUPIR_model_loader:
     FUNCTION = "process"
     CATEGORY = "SUPIR"
 
-    def process(self, supir_model, sdxl_model, diffusion_dtype, fp8_unet, model=None, clip=None, vae=None):
+    def process(self, supir_model, sdxl_model, diffusion_dtype, fp8_unet):
         device = mm.get_torch_device()
         mm.unload_all_models()
 
@@ -610,6 +605,152 @@ class SUPIR_model_loader:
 
         custom_config = {
             'sdxl_model': sdxl_model,
+            'diffusion_dtype': diffusion_dtype,
+            'supir_model': supir_model,
+            'fp8_unet': fp8_unet,
+        }
+
+        if diffusion_dtype == 'auto':
+            try:
+                if mm.should_use_fp16():
+                    print("Diffusion using fp16")
+                    dtype = torch.float16
+                    model_dtype = 'fp16'
+                elif mm.should_use_bf16():
+                    print("Diffusion using bf16")
+                    dtype = torch.bfloat16
+                    model_dtype = 'bf16'
+                else:
+                    print("Diffusion using using fp32")
+                    dtype = torch.float32
+                    model_dtype = 'fp32'
+            except:
+                raise AttributeError("ComfyUI version too old, can't autodecet properly. Set your dtypes manually.")
+        else:
+            print(f"Diffusion using using {diffusion_dtype}")
+            dtype = convert_dtype(diffusion_dtype)
+            model_dtype = diffusion_dtype
+        
+
+        if not hasattr(self, "model") or self.model is None or self.current_config != custom_config:
+            self.current_config = custom_config
+            self.model = None
+            
+            mm.soft_empty_cache()
+            
+            config = OmegaConf.load(config_path)
+           
+            if XFORMERS_IS_AVAILABLE:
+                config.model.params.control_stage_config.params.spatial_transformer_attn_type = "softmax-xformers"
+                config.model.params.network_config.params.spatial_transformer_attn_type = "softmax-xformers"
+                config.model.params.first_stage_config.params.ddconfig.attn_type = "vanilla-xformers" 
+                
+            config.model.params.diffusion_dtype = model_dtype
+            config.model.target = ".SUPIR.models.SUPIR_model_v2.SUPIRModel"
+            pbar = comfy.utils.ProgressBar(7)
+
+            self.model = instantiate_from_config(config.model).cpu()
+            pbar.update(1)
+            try:
+                print(f'Attempting to load SUPIR model: [{SUPIR_MODEL_PATH}]')
+                supir_state_dict = load_state_dict(SUPIR_MODEL_PATH)
+                pbar.update(1)
+            except:
+                raise Exception("Failed to load SUPIR model")
+            try:
+                print(f"Attempting to load SDXL model: [{SDXL_MODEL_PATH}]")
+                sdxl_state_dict = load_state_dict(SDXL_MODEL_PATH)
+                pbar.update(1)
+            except:
+                raise Exception("Failed to load SDXL model")
+            self.model.load_state_dict(supir_state_dict, strict=False)
+            pbar.update(1)
+            self.model.load_state_dict(sdxl_state_dict, strict=False)
+            pbar.update(1)
+
+            del supir_state_dict
+
+            #first clip model from SDXL checkpoint
+            try:
+                print("Loading first clip model from SDXL checkpoint")
+                
+                replace_prefix = {}
+                replace_prefix["conditioner.embedders.0.transformer."] = ""
+    
+                sd = comfy.utils.state_dict_prefix_replace(sdxl_state_dict, replace_prefix, filter_keys=False)
+                clip_text_config = CLIPTextConfig.from_pretrained(clip_config_path)
+                self.model.conditioner.embedders[0].tokenizer = CLIPTokenizer.from_pretrained(tokenizer_path)
+                self.model.conditioner.embedders[0].transformer = CLIPTextModel(clip_text_config)
+                self.model.conditioner.embedders[0].transformer.load_state_dict(sd, strict=False)
+                self.model.conditioner.embedders[0].eval()
+                for param in self.model.conditioner.embedders[0].parameters():
+                    param.requires_grad = False
+                pbar.update(1)
+            except:
+                raise Exception("Failed to load first clip model from SDXL checkpoint")
+            
+            del sdxl_state_dict
+
+            #second clip model from SDXL checkpoint
+            try:
+                print("Loading second clip model from SDXL checkpoint")
+                replace_prefix2 = {}
+                replace_prefix2["conditioner.embedders.1.model."] = ""
+                sd = comfy.utils.state_dict_prefix_replace(sd, replace_prefix2, filter_keys=True)                
+                clip_g = build_text_model_from_openai_state_dict(sd, cast_dtype=dtype)
+                self.model.conditioner.embedders[1].model = clip_g
+                pbar.update(1)
+            except:
+                raise Exception("Failed to load second clip model from SDXL checkpoint")
+        
+            del sd, clip_g
+            mm.soft_empty_cache()
+
+            self.model.to(dtype)
+
+            #only unets and/or vae to fp8 
+            if fp8_unet:
+                self.model.model.to(torch.float8_e4m3fn)
+
+        return (self.model, self.model.first_stage_model,)
+
+class SUPIR_model_loader_v2:
+    @classmethod
+    def INPUT_TYPES(s):
+        return {"required": {
+            "model" :("MODEL",),
+            "clip": ("CLIP",),
+            "vae": ("VAE",),
+            "supir_model": (folder_paths.get_filename_list("checkpoints"),),
+            "fp8_unet": ("BOOLEAN", {"default": False}),
+            "diffusion_dtype": (
+                    [
+                        'fp16',
+                        'bf16',
+                        'fp32',
+                        'auto'
+                    ], {
+                        "default": 'auto'
+                    }),
+            },
+        }
+
+    RETURN_TYPES = ("SUPIRMODEL", "SUPIRVAE")
+    RETURN_NAMES = ("SUPIR_model","SUPIR_VAE",)
+    FUNCTION = "process"
+    CATEGORY = "SUPIR"
+
+    def process(self, supir_model, diffusion_dtype, fp8_unet, model, clip, vae):
+        device = mm.get_torch_device()
+        mm.unload_all_models()
+
+        SUPIR_MODEL_PATH = folder_paths.get_full_path("checkpoints", supir_model)
+
+        config_path = os.path.join(script_directory, "options/SUPIR_v0.yaml")
+        clip_config_path = os.path.join(script_directory, "configs/clip_vit_config.json")
+        tokenizer_path = os.path.join(script_directory, "configs/tokenizer")
+
+        custom_config = {
             'diffusion_dtype': diffusion_dtype,
             'supir_model': supir_model,
             'fp8_unet': fp8_unet,
@@ -666,21 +807,16 @@ class SUPIR_model_loader:
             except:
                 raise Exception("Failed to load SUPIR model")
             try:
-                if model is None or clip is None or vae is None:
-                    print(f"Attempting to load SDXL model: [{SDXL_MODEL_PATH}]")
-                    sdxl_state_dict = load_state_dict(SDXL_MODEL_PATH)
-                else:
-                    assert model is not None and clip is not None and vae is not None, "Need to pass model, clip, and vae"
-                    print(f"Attempting to load SDXL model from node inputs")
-                    clip_sd = None
-                    load_models = [model]
-                    load_models.append(clip.load_model())
-                    clip_sd = clip.get_sd()
+                print(f"Attempting to load SDXL model from node inputs")
+                clip_sd = None
+                load_models = [model]
+                load_models.append(clip.load_model())
+                clip_sd = clip.get_sd()
 
-                    mm.load_models_gpu(load_models)
-                
-                    sd = model.model.state_dict_for_saving(clip_sd, vae.get_sd(), None)
-                    sdxl_state_dict = sd
+                mm.load_models_gpu(load_models)
+            
+                sd = model.model.state_dict_for_saving(clip_sd, vae.get_sd(), None)
+                sdxl_state_dict = sd
                 pbar.update(1)
             except:
                 raise Exception("Failed to load SDXL model")
@@ -734,7 +870,7 @@ class SUPIR_model_loader:
                 self.model.model.to(torch.float8_e4m3fn)
 
         return (self.model, self.model.first_stage_model,)
-
+    
 class SUPIR_tiles:
     @classmethod
     def INPUT_TYPES(s):
