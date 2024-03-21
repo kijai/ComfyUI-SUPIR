@@ -1,6 +1,9 @@
 # ComfyUI SUPIR upscaler wrapper node
 
 ## WORK IN PROGRESS
+# UPDATE2:
+![image](https://github.com/kijai/ComfyUI-SUPIR/assets/40791699/65baec3e-cb4a-4eec-8d45-2b08157b1e86)
+Added a better way to load the SDXL model, which also allows using LoRAs. The old node will remain for now to not break old workflows, and it is dubbed Legacy along with the single node, as I do not want to maintain those.
 
 # UPDATE:
 
