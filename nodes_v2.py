@@ -189,14 +189,14 @@ class SUPIR_decode:
         device = mm.get_torch_device()
         mm.unload_all_models()
         samples = latents["samples"]
-        dtype = samples.dtype
+        dtype = SUPIR_VAE.dtype
         orig_H, orig_W = latents["original_size"]
         
         B, H, W, C = samples.shape
                 
         pbar = comfy.utils.ProgressBar(B)
-
-        SUPIR_VAE.to(dtype).to(device)
+  
+        SUPIR_VAE.to(device)
 
         if use_tiled_vae:
             from .SUPIR.utils.tilevae import VAEHook
@@ -224,7 +224,7 @@ class SUPIR_decode:
         if decoded_out.shape[2] != orig_H or decoded_out.shape[3] != orig_W:
             print("Restoring original dimensions: ", orig_W,"x",orig_H)
             decoded_out = F.interpolate(decoded_out, size=(orig_H, orig_W), mode="bicubic")
-            
+
         decoded_out = decoded_out.cpu().to(torch.float32).permute(0, 2, 3, 1)
         decoded_out = torch.clip(decoded_out, 0, 1)
 
