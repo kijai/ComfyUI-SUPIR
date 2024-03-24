@@ -434,7 +434,12 @@ class SUPIR_sample:
         pbar = comfy.utils.ProgressBar(samples.shape[0])
         for i, sample in enumerate(samples):
             try:
-                noised_z = torch.randn_like(sample.unsqueeze(0), device=samples.device)
+                if 'original_size' in latents:
+                    print("Using random noise")
+                    noised_z = torch.randn_like(sample.unsqueeze(0), device=samples.device)
+                else:
+                    print("Using latent from input")
+                    noised_z = sample.unsqueeze(0) * 0.13025
                 if len(positive) != len(samples):
                     print("Tiled sampling")
                     _samples = self.sampler(denoiser, noised_z, cond=positive, uc=negative, x_center=sample.unsqueeze(0), control_scale=control_scale_end,
@@ -802,69 +807,72 @@ class SUPIR_model_loader_v2:
             self.model = instantiate_from_config(config.model).cpu()
             pbar.update(1)
             try:
-                print(f'Attempting to load SUPIR model: [{SUPIR_MODEL_PATH}]')
-                supir_state_dict = load_state_dict(SUPIR_MODEL_PATH)
-                pbar.update(1)
-            except:
-                raise Exception("Failed to load SUPIR model")
-            try:
                 print(f"Attempting to load SDXL model from node inputs")
-                clip_sd = None
-                load_models = [model]
-                load_models.append(clip.load_model())
-                clip_sd = clip.get_sd()
-
-                mm.load_models_gpu(load_models)
-            
-                sd = model.model.state_dict_for_saving(clip_sd, vae.get_sd(), None)
-                sdxl_state_dict = sd
+                mm.load_model_gpu(model)
+                sdxl_state_dict = model.model.state_dict_for_saving(None, vae.get_sd(), None)
+                self.model.load_state_dict(sdxl_state_dict, strict=False)
+                if fp8_unet:
+                    self.model.model.to(torch.float8_e4m3fn)
+                else:
+                    self.model.model.to(dtype)
+                del sdxl_state_dict
                 pbar.update(1)
             except:
-                raise Exception("Failed to load SDXL model")
-            self.model.load_state_dict(supir_state_dict, strict=False)
-            pbar.update(1)
-            self.model.load_state_dict(sdxl_state_dict, strict=False)
-            pbar.update(1)
-
-            del supir_state_dict
+                raise Exception("Failed to load SDXL model")            
 
             #first clip model from SDXL checkpoint
             try:
                 print("Loading first clip model from SDXL checkpoint")
-                
+                clip_sd = None
+                clip_model = clip.load_model()
+                mm.load_model_gpu(clip_model)
+                clip_sd = clip.get_sd()
+                clip_sd = model.model.model_config.process_clip_state_dict_for_saving(clip_sd)
+
                 replace_prefix = {}
                 replace_prefix["conditioner.embedders.0.transformer."] = ""
     
-                sd = comfy.utils.state_dict_prefix_replace(sdxl_state_dict, replace_prefix, filter_keys=False)
+                clip_l_sd = comfy.utils.state_dict_prefix_replace(clip_sd, replace_prefix, filter_keys=False)
                 clip_text_config = CLIPTextConfig.from_pretrained(clip_config_path)
                 self.model.conditioner.embedders[0].tokenizer = CLIPTokenizer.from_pretrained(tokenizer_path)
                 self.model.conditioner.embedders[0].transformer = CLIPTextModel(clip_text_config)
-                self.model.conditioner.embedders[0].transformer.load_state_dict(sd, strict=False)
+                self.model.conditioner.embedders[0].transformer.load_state_dict(clip_l_sd, strict=False)
                 self.model.conditioner.embedders[0].eval()
                 for param in self.model.conditioner.embedders[0].parameters():
                     param.requires_grad = False
+                self.model.conditioner.embedders[0].to(dtype)
+                del clip_l_sd
                 pbar.update(1)
             except:
                 raise Exception("Failed to load first clip model from SDXL checkpoint")
             
-            del sdxl_state_dict
-
             #second clip model from SDXL checkpoint
             try:
                 print("Loading second clip model from SDXL checkpoint")
                 replace_prefix2 = {}
                 replace_prefix2["conditioner.embedders.1.model."] = ""
-                sd = comfy.utils.state_dict_prefix_replace(sd, replace_prefix2, filter_keys=True)                
-                clip_g = build_text_model_from_openai_state_dict(sd, cast_dtype=dtype)
+                clip_g_sd = comfy.utils.state_dict_prefix_replace(clip_sd, replace_prefix2, filter_keys=True)             
+                clip_g = build_text_model_from_openai_state_dict(clip_g_sd, cast_dtype=dtype)
                 self.model.conditioner.embedders[1].model = clip_g
+                self.model.conditioner.embedders[1].model.to(dtype)
+                del clip_g_sd
                 pbar.update(1)
             except:
                 raise Exception("Failed to load second clip model from SDXL checkpoint")
-        
-            del sd, clip_g
+            
+            try:
+                print(f'Attempting to load SUPIR model: [{SUPIR_MODEL_PATH}]')
+                supir_state_dict = load_state_dict(SUPIR_MODEL_PATH)
+                self.model.load_state_dict(supir_state_dict, strict=False)
+                if fp8_unet:
+                    self.model.model.to(torch.float8_e4m3fn)
+                else:
+                    self.model.model.to(dtype)
+                del supir_state_dict
+                pbar.update(1)
+            except:
+                raise Exception("Failed to load SUPIR model")
             mm.soft_empty_cache()
-
-            self.model.to(dtype)
 
             #only unets and/or vae to fp8 
             if fp8_unet:
