@@ -4,8 +4,6 @@ from omegaconf import OmegaConf
 import comfy.utils
 import comfy.model_management as mm
 import folder_paths
-from nodes import ImageScaleBy
-from nodes import ImageScale
 import torch.cuda
 import torch.nn.functional as F
 from .sgm.util import instantiate_from_config
@@ -13,6 +11,7 @@ from .SUPIR.util import convert_dtype, load_state_dict
 from .sgm.modules.distributions.distributions import DiagonalGaussianDistribution
 import open_clip
 from contextlib import contextmanager, nullcontext
+import gc
 
 from transformers import (
     CLIPTextModel,
@@ -653,29 +652,26 @@ class SUPIR_model_loader:
                 
             config.model.params.diffusion_dtype = model_dtype
             config.model.target = ".SUPIR.models.SUPIR_model_v2.SUPIRModel"
-            pbar = comfy.utils.ProgressBar(7)
+            pbar = comfy.utils.ProgressBar(5)
 
             self.model = instantiate_from_config(config.model).cpu()
             pbar.update(1)
             try:
                 print(f'Attempting to load SUPIR model: [{SUPIR_MODEL_PATH}]')
                 supir_state_dict = load_state_dict(SUPIR_MODEL_PATH)
+                self.model.load_state_dict(supir_state_dict, strict=False)
+                del supir_state_dict
                 pbar.update(1)
             except:
                 raise Exception("Failed to load SUPIR model")
             try:
                 print(f"Attempting to load SDXL model: [{SDXL_MODEL_PATH}]")
                 sdxl_state_dict = load_state_dict(SDXL_MODEL_PATH)
+                self.model.load_state_dict(sdxl_state_dict, strict=False)
                 pbar.update(1)
             except:
                 raise Exception("Failed to load SDXL model")
-            self.model.load_state_dict(supir_state_dict, strict=False)
-            pbar.update(1)
-            self.model.load_state_dict(sdxl_state_dict, strict=False)
-            pbar.update(1)
-
-            del supir_state_dict
-
+            
             #first clip model from SDXL checkpoint
             try:
                 print("Loading first clip model from SDXL checkpoint")
@@ -786,7 +782,6 @@ class SUPIR_model_loader_v2:
             dtype = convert_dtype(diffusion_dtype)
             model_dtype = diffusion_dtype
         
-
         if not hasattr(self, "model") or self.model is None or self.current_config != custom_config:
             self.current_config = custom_config
             self.model = None
@@ -802,7 +797,7 @@ class SUPIR_model_loader_v2:
                 
             config.model.params.diffusion_dtype = model_dtype
             config.model.target = ".SUPIR.models.SUPIR_model_v2.SUPIRModel"
-            pbar = comfy.utils.ProgressBar(7)
+            pbar = comfy.utils.ProgressBar(5)
 
             self.model = instantiate_from_config(config.model).cpu()
             pbar.update(1)
@@ -819,7 +814,8 @@ class SUPIR_model_loader_v2:
                 pbar.update(1)
             except:
                 raise Exception("Failed to load SDXL model")            
-
+            gc.collect()
+            mm.soft_empty_cache()
             #first clip model from SDXL checkpoint
             try:
                 print("Loading first clip model from SDXL checkpoint")
@@ -845,7 +841,8 @@ class SUPIR_model_loader_v2:
                 pbar.update(1)
             except:
                 raise Exception("Failed to load first clip model from SDXL checkpoint")
-            
+            gc.collect()
+            mm.soft_empty_cache()
             #second clip model from SDXL checkpoint
             try:
                 print("Loading second clip model from SDXL checkpoint")
