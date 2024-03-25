@@ -650,6 +650,10 @@ class SUPIR_model_loader:
                 print(f'Attempting to load SUPIR model: [{SUPIR_MODEL_PATH}]')
                 supir_state_dict = load_state_dict(SUPIR_MODEL_PATH)
                 self.model.load_state_dict(supir_state_dict, strict=False)
+                if fp8_unet:
+                    self.model.model.to(torch.float8_e4m3fn)
+                else:
+                    self.model.model.to(dtype)
                 del supir_state_dict
                 pbar.update(1)
             except:
@@ -658,6 +662,10 @@ class SUPIR_model_loader:
                 print(f"Attempting to load SDXL model: [{SDXL_MODEL_PATH}]")
                 sdxl_state_dict = load_state_dict(SDXL_MODEL_PATH)
                 self.model.load_state_dict(sdxl_state_dict, strict=False)
+                if fp8_unet:
+                    self.model.model.to(torch.float8_e4m3fn)
+                else:
+                    self.model.model.to(dtype)
                 pbar.update(1)
             except:
                 raise Exception("Failed to load SDXL model")
@@ -699,8 +707,6 @@ class SUPIR_model_loader:
         
             del sd, clip_g
             mm.soft_empty_cache()
-
-            self.model.to(dtype)
 
             #only unets and/or vae to fp8 
             if fp8_unet:
@@ -858,10 +864,6 @@ class SUPIR_model_loader_v2:
             except:
                 raise Exception("Failed to load SUPIR model")
             mm.soft_empty_cache()
-
-            #only unets and/or vae to fp8 
-            if fp8_unet:
-                self.model.model.to(torch.float8_e4m3fn)
 
         return (self.model, self.model.first_stage_model,)
     
