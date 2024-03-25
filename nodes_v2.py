@@ -21,15 +21,6 @@ from transformers import (
 )
 script_directory = os.path.dirname(os.path.abspath(__file__))
 
-try:
-    import xformers
-    import xformers.ops
-
-    XFORMERS_IS_AVAILABLE = True
-except:
-    XFORMERS_IS_AVAILABLE = False
-
-
 def dummy_build_vision_tower(*args, **kwargs):
     # Monkey patch the CLIP class before you create an instance.
     return None
@@ -644,7 +635,8 @@ class SUPIR_model_loader:
             
             config = OmegaConf.load(config_path)
            
-            if XFORMERS_IS_AVAILABLE:
+            if mm.XFORMERS_IS_AVAILABLE:
+                print("Using XFORMERS")
                 config.model.params.control_stage_config.params.spatial_transformer_attn_type = "softmax-xformers"
                 config.model.params.network_config.params.spatial_transformer_attn_type = "softmax-xformers"
                 config.model.params.first_stage_config.params.ddconfig.attn_type = "vanilla-xformers" 
@@ -784,8 +776,8 @@ class SUPIR_model_loader_v2:
             mm.soft_empty_cache()
             
             config = OmegaConf.load(config_path)
-           
-            if XFORMERS_IS_AVAILABLE:
+            if mm.XFORMERS_IS_AVAILABLE:
+                print("Using XFORMERS")
                 config.model.params.control_stage_config.params.spatial_transformer_attn_type = "softmax-xformers"
                 config.model.params.network_config.params.spatial_transformer_attn_type = "softmax-xformers"
                 config.model.params.first_stage_config.params.ddconfig.attn_type = "vanilla-xformers" 

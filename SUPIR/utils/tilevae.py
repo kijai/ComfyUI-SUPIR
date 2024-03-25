@@ -66,20 +66,20 @@ import torch
 import torch.version
 import torch.nn.functional as F
 from einops import rearrange
-#from diffusers.utils.import_utils import is_xformers_available
-
-#import SUPIR.utils.devices as devices
 
 import comfy.model_management
 device = comfy.model_management.get_torch_device()
 
-try:
-    import xformers
-    import xformers.ops
-    XFORMERS_IS_AVAILABLE = True
-except:
+if comfy.model_management.XFORMERS_IS_AVAILABLE:
+    try:
+        import xformers
+        import xformers.ops
+        XFORMERS_IS_AVAILABLE = True
+    except:
+        XFORMERS_IS_AVAILABLE = False
+        print("no module 'xformers'. Processing without...")
+else:
     XFORMERS_IS_AVAILABLE = False
-    print("no module 'xformers'. Processing without...")
 
 sd_flag = True
 
