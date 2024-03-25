@@ -113,13 +113,13 @@ class SUPIR_encode:
                     print("Encoder using bf16")
                     vae_dtype = 'bf16'
                 else:
-                    print("Encoder using using fp32")
+                    print("Encoder using fp32")
                     vae_dtype = 'fp32'
             except:
                 raise AttributeError("ComfyUI version too old, can't autodetect properly. Set your dtypes manually.")
         else:
             vae_dtype = encoder_dtype
-            print(f"Encoder using using {vae_dtype}")
+            print(f"Encoder using {vae_dtype}")
 
         dtype = convert_dtype(vae_dtype)
 
@@ -264,13 +264,13 @@ class SUPIR_first_stage:
                     print("Encoder using bf16")
                     vae_dtype = 'bf16'
                 else:
-                    print("Encoder using using fp32")
+                    print("Encoder using fp32")
                     vae_dtype = 'fp32'
             except:
                 raise AttributeError("ComfyUI version too old, can't autodetect properly. Set your dtypes manually.")
         else:
             vae_dtype = encoder_dtype
-            print(f"Encoder using using {vae_dtype}")
+            print(f"Encoder using {vae_dtype}")
 
         dtype = convert_dtype(vae_dtype)
 
@@ -501,7 +501,6 @@ class SUPIR_conditioner:
     def condition(self, SUPIR_model, latents, positive_prompt, negative_prompt, captions=""):
         
         device = mm.get_torch_device()
-        mm.unload_all_models()
         mm.soft_empty_cache()
         samples = latents["samples"]
         N, H, W, C = samples.shape
@@ -626,13 +625,13 @@ class SUPIR_model_loader:
                     dtype = torch.bfloat16
                     model_dtype = 'bf16'
                 else:
-                    print("Diffusion using using fp32")
+                    print("Diffusion using fp32")
                     dtype = torch.float32
                     model_dtype = 'fp32'
             except:
-                raise AttributeError("ComfyUI version too old, can't autodecet properly. Set your dtypes manually.")
+                raise AttributeError("ComfyUI version too old, can't autodetect properly. Set your dtypes manually.")
         else:
-            print(f"Diffusion using using {diffusion_dtype}")
+            print(f"Diffusion using {diffusion_dtype}")
             dtype = convert_dtype(diffusion_dtype)
             model_dtype = diffusion_dtype
         
@@ -766,21 +765,17 @@ class SUPIR_model_loader_v2:
                 if mm.should_use_fp16():
                     print("Diffusion using fp16")
                     dtype = torch.float16
-                    model_dtype = 'fp16'
                 elif mm.should_use_bf16():
                     print("Diffusion using bf16")
                     dtype = torch.bfloat16
-                    model_dtype = 'bf16'
                 else:
-                    print("Diffusion using using fp32")
+                    print("Diffusion using fp32")
                     dtype = torch.float32
-                    model_dtype = 'fp32'
             except:
                 raise AttributeError("ComfyUI version too old, can't autodecet properly. Set your dtypes manually.")
         else:
-            print(f"Diffusion using using {diffusion_dtype}")
+            print(f"Diffusion using {diffusion_dtype}")
             dtype = convert_dtype(diffusion_dtype)
-            model_dtype = diffusion_dtype
         
         if not hasattr(self, "model") or self.model is None or self.current_config != custom_config:
             self.current_config = custom_config
@@ -795,11 +790,11 @@ class SUPIR_model_loader_v2:
                 config.model.params.network_config.params.spatial_transformer_attn_type = "softmax-xformers"
                 config.model.params.first_stage_config.params.ddconfig.attn_type = "vanilla-xformers" 
                 
-            config.model.params.diffusion_dtype = model_dtype
             config.model.target = ".SUPIR.models.SUPIR_model_v2.SUPIRModel"
             pbar = comfy.utils.ProgressBar(5)
 
             self.model = instantiate_from_config(config.model).cpu()
+            self.model.model.dtype = dtype
             pbar.update(1)
             try:
                 print(f"Attempting to load SDXL model from node inputs")
