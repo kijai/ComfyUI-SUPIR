@@ -626,7 +626,6 @@ class SUPIR_model_loader:
             dtype = convert_dtype(diffusion_dtype)
             model_dtype = diffusion_dtype
         
-
         if not hasattr(self, "model") or self.model is None or self.current_config != custom_config:
             self.current_config = custom_config
             self.model = None
@@ -676,6 +675,7 @@ class SUPIR_model_loader:
                 self.model.conditioner.embedders[0].transformer = CLIPTextModel(clip_text_config)
                 self.model.conditioner.embedders[0].transformer.load_state_dict(sd, strict=False)
                 self.model.conditioner.embedders[0].eval()
+                self.model.conditioner.embedders[0].to(dtype)
                 for param in self.model.conditioner.embedders[0].parameters():
                     param.requires_grad = False
                 pbar.update(1)
@@ -692,6 +692,7 @@ class SUPIR_model_loader:
                 sd = comfy.utils.state_dict_prefix_replace(sd, replace_prefix2, filter_keys=True)                
                 clip_g = build_text_model_from_openai_state_dict(sd, cast_dtype=dtype)
                 self.model.conditioner.embedders[1].model = clip_g
+                self.model.conditioner.embedders[1].to(dtype)
                 pbar.update(1)
             except:
                 raise Exception("Failed to load second clip model from SDXL checkpoint")
