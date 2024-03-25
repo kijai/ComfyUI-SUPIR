@@ -645,19 +645,8 @@ class SUPIR_model_loader:
             pbar = comfy.utils.ProgressBar(5)
 
             self.model = instantiate_from_config(config.model).cpu()
+            self.model.model.dtype = dtype
             pbar.update(1)
-            try:
-                print(f'Attempting to load SUPIR model: [{SUPIR_MODEL_PATH}]')
-                supir_state_dict = load_state_dict(SUPIR_MODEL_PATH)
-                self.model.load_state_dict(supir_state_dict, strict=False)
-                if fp8_unet:
-                    self.model.model.to(torch.float8_e4m3fn)
-                else:
-                    self.model.model.to(dtype)
-                del supir_state_dict
-                pbar.update(1)
-            except:
-                raise Exception("Failed to load SUPIR model")
             try:
                 print(f"Attempting to load SDXL model: [{SDXL_MODEL_PATH}]")
                 sdxl_state_dict = load_state_dict(SDXL_MODEL_PATH)
@@ -706,11 +695,20 @@ class SUPIR_model_loader:
                 raise Exception("Failed to load second clip model from SDXL checkpoint")
         
             del sd, clip_g
-            mm.soft_empty_cache()
 
-            #only unets and/or vae to fp8 
-            if fp8_unet:
-                self.model.model.to(torch.float8_e4m3fn)
+            try:
+                print(f'Attempting to load SUPIR model: [{SUPIR_MODEL_PATH}]')
+                supir_state_dict = load_state_dict(SUPIR_MODEL_PATH)
+                self.model.load_state_dict(supir_state_dict, strict=False)
+                if fp8_unet:
+                    self.model.model.to(torch.float8_e4m3fn)
+                else:
+                    self.model.model.to(dtype)
+                del supir_state_dict
+                pbar.update(1)
+            except:
+                raise Exception("Failed to load SUPIR model")
+            mm.soft_empty_cache()
 
         return (self.model, self.model.first_stage_model,)
 
