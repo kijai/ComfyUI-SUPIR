@@ -215,8 +215,9 @@ class SUPIR_decode:
             print("Restoring original dimensions: ", orig_W,"x",orig_H)
             decoded_out = F.interpolate(decoded_out, size=(orig_H, orig_W), mode="bicubic")
 
-        decoded_out = decoded_out.cpu().to(torch.float32).permute(0, 2, 3, 1)
         decoded_out = torch.clip(decoded_out, 0, 1)
+        decoded_out = decoded_out.cpu().to(torch.float32).permute(0, 2, 3, 1)
+        
 
         return (decoded_out,)
         
