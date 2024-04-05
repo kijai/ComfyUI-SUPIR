@@ -187,6 +187,7 @@ class SUPIR_decode:
         pbar = comfy.utils.ProgressBar(B)
   
         SUPIR_VAE.to(device)
+        samples = samples.to(device)
 
         if use_tiled_vae:
             from .SUPIR.utils.tilevae import VAEHook
