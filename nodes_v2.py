@@ -246,6 +246,12 @@ class SUPIR_first_stage:
     RETURN_NAMES = ("SUPIR_VAE", "denoised_image", "denoised_latents",)
     FUNCTION = "process"
     CATEGORY = "SUPIR"
+    DESCRIPTION = """
+SUPIR "first stage" processing.
+Encodes and decodes the image using SUPIR's "denoise_encoder", purpose  
+is to fix compression artifacts and such, ends up blurring the image often  
+which is expected. Can be replaced with any other denoiser/blur or not used at all.
+"""
 
     def process(self, SUPIR_VAE, image, encoder_dtype, use_tiled_vae, encoder_tile_size, decoder_tile_size):
         device = mm.get_torch_device()
@@ -364,7 +370,6 @@ class SUPIR_sample:
     RETURN_TYPES = ("LATENT",)
     RETURN_NAMES = ("latent",)
     FUNCTION = "sample"
-    DESCRIPTION="Samples using SUPIR's modified diffusion."
     CATEGORY = "SUPIR"
 
     def sample(self, SUPIR_model, latents, steps, seed, cfg_scale_end, EDM_s_churn, s_noise, positive, negative,
@@ -488,8 +493,16 @@ class SUPIR_conditioner:
     RETURN_TYPES = ("SUPIR_cond_pos", "SUPIR_cond_neg",)
     RETURN_NAMES = ("positive", "negative",)
     FUNCTION = "condition"
-
     CATEGORY = "SUPIR"
+    DESCRIPTION = """
+Creates the conditioning for the sampler.  
+Caption input is optional, when it receives a single caption, it's added to the positive prompt.
+    
+If a list of caption is given for single input image, the captions need to match the number of tiles,  
+refer to the SUPIR Tiles node.  
+  
+If a list of captions is given and it matches the incoming image batch, each image uses corresponding caption.
+"""
 
     def condition(self, SUPIR_model, latents, positive_prompt, negative_prompt, captions=""):
         
@@ -588,6 +601,10 @@ class SUPIR_model_loader:
     RETURN_NAMES = ("SUPIR_model","SUPIR_VAE",)
     FUNCTION = "process"
     CATEGORY = "SUPIR"
+    DESCRIPTION = """
+Old loader, not recommended to be used.  
+Loads the SUPIR model and the selected SDXL model and merges them.
+"""
 
     def process(self, supir_model, sdxl_model, diffusion_dtype, fp8_unet):
         device = mm.get_torch_device()
@@ -739,6 +756,12 @@ class SUPIR_model_loader_v2:
     RETURN_NAMES = ("SUPIR_model","SUPIR_VAE",)
     FUNCTION = "process"
     CATEGORY = "SUPIR"
+    DESCRIPTION = """
+Loads the SUPIR model and merges it with the SDXL model.  
+
+Diffusion type should be kept on auto, unless you have issues loading the model.  
+fp8_unet casts the unet weights to torch.float8_e4m3fn, which saves a lot of VRAM but has slight quality impact.  
+"""
 
     def process(self, supir_model, diffusion_dtype, fp8_unet, model, clip, vae):
         device = mm.get_torch_device()
@@ -882,6 +905,10 @@ class SUPIR_tiles:
     RETURN_NAMES = ("image_tiles", "tile_size", "tile_stride",)
     FUNCTION = "tile"
     CATEGORY = "SUPIR"
+    DESCRIPTION = """
+Tiles the image with same function as the Tiled samplers use.  
+Useful for previewing the tiling and generating captions per tile (WIP feature)
+"""
 
     def tile(self, image, tile_size, tile_stride):
 
