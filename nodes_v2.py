@@ -371,6 +371,40 @@ class SUPIR_sample:
     RETURN_NAMES = ("latent",)
     FUNCTION = "sample"
     CATEGORY = "SUPIR"
+    DESCRIPTION = """
+- **latent:**
+Latent to sample from, when using SUPIR latent this is just for the noise shape,  
+it's actually not used otherwise here. Identical to feeding this comfy empty latent.  
+If fed anything else it's used as it is, no noise is added.  
+- **cfg:**
+Linearly scaled CFG is always used, first step will use the cfg_scale_start value,  
+and that is interpolated to the cfg_scale_end value at last step.  
+To disable scaling set these values to be the same.  
+- **EDM_s_churn:**
+controls the rate of adaptation of the diffusion process to changes in noise levels  
+over time. Has no effect with DPMPP samplers.  
+- **s_noise:**
+This parameter directly controls the amount of noise added to the image at each  
+step of the diffusion process.  
+- **DPMPP_eta:**
+Scaling factor that influences the diffusion process by adjusting how the denoising  
+process adapts to changes in noise levels over time.
+No effect with EDM samplers.  
+- **control_scale:**
+The strenght of the SUPIR control model, scales linearly from start to end.  
+Lower values allow more freedom from the input image.  
+- **restore_cfg:**
+Controls the degree of restoration towards the original image during the diffusion   
+process. It allows for dome fine-tuning of the process.  
+- **samplers:**
+EDM samplers need lots of steps but generally have better quality.  
+DPMPP samplers work well with lower steps, good for lightning models.  
+Tiled samplers enable tiled diffusion process, this is very slow but allows higher  
+resolutions to be used by saving VRAM.  Tile size should be chosen so the image  
+is evenly tiled.  Tile stride affects the overlap of the tiles.  Check the  
+SUPIR Tiles -node for preview to understand how the image is tiled.
+
+"""
 
     def sample(self, SUPIR_model, latents, steps, seed, cfg_scale_end, EDM_s_churn, s_noise, positive, negative,
                 cfg_scale_start, control_scale_start, control_scale_end, restore_cfg, keep_model_loaded, DPMPP_eta,
