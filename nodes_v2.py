@@ -13,6 +13,14 @@ import open_clip
 from contextlib import contextmanager, nullcontext
 import gc
 
+from contextlib import nullcontext
+try:
+    from accelerate import init_empty_weights
+    from accelerate.utils import set_module_tensor_to_device
+    is_accelerate_available = True
+except:
+    pass
+
 from transformers import (
     CLIPTextModel,
     CLIPTokenizer,
@@ -39,7 +47,7 @@ def build_text_model_from_openai_state_dict(
         state_dict: dict,
         cast_dtype=torch.float16,
     ):
-
+    device = mm.get_torch_device()
     embed_dim = state_dict["text_projection"].shape[1]
     context_length = state_dict["positional_embedding"].shape[0]
     vocab_size = state_dict["token_embedding.weight"].shape[0]
@@ -57,15 +65,17 @@ def build_text_model_from_openai_state_dict(
     )
 
     with patch_build_vision_tower():
-        model = open_clip.CLIP(
-            embed_dim,
-            vision_cfg=vision_cfg,
-            text_cfg=text_cfg,
-            quick_gelu=True,
-            cast_dtype=cast_dtype,
-        )
-
-    model.load_state_dict(state_dict, strict=False)
+        with (init_empty_weights() if is_accelerate_available else nullcontext()):
+            model = open_clip.CLIP(
+                embed_dim,
+                vision_cfg=vision_cfg,
+                text_cfg=text_cfg,
+                quick_gelu=True,
+                cast_dtype=cast_dtype,
+            )
+    for key in state_dict:
+        set_module_tensor_to_device(model, key, device=device, value=state_dict[key])
+    #model.load_state_dict(state_dict, strict=False)
     model = model.eval()
     for param in model.parameters():
         param.requires_grad = False
@@ -849,6 +859,7 @@ fp8_unet casts the unet weights to torch.float8_e4m3fn, which saves a lot of VRA
             config.model.target = ".SUPIR.models.SUPIR_model_v2.SUPIRModel"
             pbar = comfy.utils.ProgressBar(5)
 
+            #with (init_empty_weights() if is_accelerate_available else nullcontext()):
             self.model = instantiate_from_config(config.model).cpu()
             self.model.model.dtype = dtype
             pbar.update(1)
@@ -856,7 +867,9 @@ fp8_unet casts the unet weights to torch.float8_e4m3fn, which saves a lot of VRA
                 print(f"Attempting to load SDXL model from node inputs")
                 mm.load_model_gpu(model)
                 sdxl_state_dict = model.model.state_dict_for_saving(None, vae.get_sd(), None)
-                self.model.load_state_dict(sdxl_state_dict, strict=False)
+                for key in sdxl_state_dict:
+                    set_module_tensor_to_device(self.model, key, device=device, dtype=dtype, value=sdxl_state_dict[key])
+                #self.model.load_state_dict(sdxl_state_dict, strict=False)
                 if fp8_unet:
                     self.model.model.to(torch.float8_e4m3fn)
                 else:
@@ -879,10 +892,13 @@ fp8_unet casts the unet weights to torch.float8_e4m3fn, which saves a lot of VRA
                 replace_prefix = {}
                 replace_prefix["conditioner.embedders.0.transformer."] = ""
     
-                clip_l_sd = comfy.utils.state_dict_prefix_replace(clip_sd, replace_prefix, filter_keys=False)
+                clip_l_sd = comfy.utils.state_dict_prefix_replace(clip_sd, replace_prefix, filter_keys=True)
                 clip_text_config = CLIPTextConfig.from_pretrained(clip_config_path)
                 self.model.conditioner.embedders[0].tokenizer = CLIPTokenizer.from_pretrained(tokenizer_path)
-                self.model.conditioner.embedders[0].transformer = CLIPTextModel(clip_text_config)
+                with (init_empty_weights() if is_accelerate_available else nullcontext()):
+                    self.model.conditioner.embedders[0].transformer = CLIPTextModel(clip_text_config)
+                for key in clip_l_sd:
+                    set_module_tensor_to_device(self.model.conditioner.embedders[0].transformer, key, device=device, dtype=dtype, value=clip_l_sd[key])
                 self.model.conditioner.embedders[0].transformer.load_state_dict(clip_l_sd, strict=False)
                 self.model.conditioner.embedders[0].eval()
                 for param in self.model.conditioner.embedders[0].parameters():
@@ -911,7 +927,11 @@ fp8_unet casts the unet weights to torch.float8_e4m3fn, which saves a lot of VRA
             try:
                 print(f'Attempting to load SUPIR model: [{SUPIR_MODEL_PATH}]')
                 supir_state_dict = load_state_dict(SUPIR_MODEL_PATH)
-                self.model.load_state_dict(supir_state_dict, strict=False)
+                if "Q" not in supir_model: #I don't know why this doesn't work with the Q model.
+                    for key in supir_state_dict:
+                        set_module_tensor_to_device(self.model, key, device=device, dtype=dtype, value=supir_state_dict[key])
+                else:
+                    self.model.load_state_dict(supir_state_dict, strict=False)
                 if fp8_unet:
                     self.model.model.to(torch.float8_e4m3fn)
                 else:
