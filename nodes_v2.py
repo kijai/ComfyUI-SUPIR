@@ -45,9 +45,10 @@ def patch_build_vision_tower():
 
 def build_text_model_from_openai_state_dict(
         state_dict: dict,
-        cast_dtype=torch.float16,
+        device,
+        cast_dtype=torch.float16,    
     ):
-    device = mm.get_torch_device()
+   
     embed_dim = state_dict["text_projection"].shape[1]
     context_length = state_dict["positional_embedding"].shape[0]
     vocab_size = state_dict["token_embedding.weight"].shape[0]
@@ -750,7 +751,7 @@ Loads the SUPIR model and the selected SDXL model and merges them.
                 replace_prefix2 = {}
                 replace_prefix2["conditioner.embedders.1.model."] = ""
                 sd = comfy.utils.state_dict_prefix_replace(sd, replace_prefix2, filter_keys=True)                
-                clip_g = build_text_model_from_openai_state_dict(sd, cast_dtype=dtype)
+                clip_g = build_text_model_from_openai_state_dict(sd, device, cast_dtype=dtype)
                 self.model.conditioner.embedders[1].model = clip_g
                 self.model.conditioner.embedders[1].to(dtype)
                 pbar.update(1)
@@ -794,6 +795,9 @@ class SUPIR_model_loader_v2:
                         "default": 'auto'
                     }),
             },
+            "optional": {
+                "high_vram": ("BOOLEAN", {"default": False}),
+            }
         }
 
     RETURN_TYPES = ("SUPIRMODEL", "SUPIRVAE")
@@ -805,10 +809,15 @@ Loads the SUPIR model and merges it with the SDXL model.
 
 Diffusion type should be kept on auto, unless you have issues loading the model.  
 fp8_unet casts the unet weights to torch.float8_e4m3fn, which saves a lot of VRAM but has slight quality impact.  
+high_vram: uses Accelerate to load weights to GPU, faster model loading.
 """
 
-    def process(self, supir_model, diffusion_dtype, fp8_unet, model, clip, vae):
-        device = mm.get_torch_device()
+    def process(self, supir_model, diffusion_dtype, fp8_unet, model, clip, vae, high_vram=False):
+        if high_vram:
+            device = mm.get_torch_device()
+        else:
+            device = mm.unet_offload_device()
+        print("Loading weights to: ", device)
         mm.unload_all_models()
 
         SUPIR_MODEL_PATH = folder_paths.get_full_path("checkpoints", supir_model)
@@ -899,7 +908,6 @@ fp8_unet casts the unet weights to torch.float8_e4m3fn, which saves a lot of VRA
                     self.model.conditioner.embedders[0].transformer = CLIPTextModel(clip_text_config)
                 for key in clip_l_sd:
                     set_module_tensor_to_device(self.model.conditioner.embedders[0].transformer, key, device=device, dtype=dtype, value=clip_l_sd[key])
-                self.model.conditioner.embedders[0].transformer.load_state_dict(clip_l_sd, strict=False)
                 self.model.conditioner.embedders[0].eval()
                 for param in self.model.conditioner.embedders[0].parameters():
                     param.requires_grad = False
@@ -916,7 +924,7 @@ fp8_unet casts the unet weights to torch.float8_e4m3fn, which saves a lot of VRA
                 replace_prefix2 = {}
                 replace_prefix2["conditioner.embedders.1.model."] = ""
                 clip_g_sd = comfy.utils.state_dict_prefix_replace(clip_sd, replace_prefix2, filter_keys=True)             
-                clip_g = build_text_model_from_openai_state_dict(clip_g_sd, cast_dtype=dtype)
+                clip_g = build_text_model_from_openai_state_dict(clip_g_sd, device, cast_dtype=dtype)
                 self.model.conditioner.embedders[1].model = clip_g
                 self.model.conditioner.embedders[1].model.to(dtype)
                 del clip_g_sd
