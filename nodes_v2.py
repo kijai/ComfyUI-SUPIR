@@ -74,9 +74,11 @@ def build_text_model_from_openai_state_dict(
                 quick_gelu=True,
                 cast_dtype=cast_dtype,
             )
-    for key in state_dict:
-        set_module_tensor_to_device(model, key, device=device, value=state_dict[key])
-    #model.load_state_dict(state_dict, strict=False)
+    if is_accelerate_available:
+        for key in state_dict:
+            set_module_tensor_to_device(model, key, device=device, value=state_dict[key])
+    else:
+        model.load_state_dict(state_dict, strict=False)
     model = model.eval()
     for param in model.parameters():
         param.requires_grad = False
@@ -809,7 +811,7 @@ Loads the SUPIR model and merges it with the SDXL model.
 
 Diffusion type should be kept on auto, unless you have issues loading the model.  
 fp8_unet casts the unet weights to torch.float8_e4m3fn, which saves a lot of VRAM but has slight quality impact.  
-high_vram: uses Accelerate to load weights to GPU, faster model loading.
+high_vram: uses Accelerate to load weights to GPU, slightly faster model loading.
 """
 
     def process(self, supir_model, diffusion_dtype, fp8_unet, model, clip, vae, high_vram=False):
@@ -876,9 +878,11 @@ high_vram: uses Accelerate to load weights to GPU, faster model loading.
                 print(f"Attempting to load SDXL model from node inputs")
                 mm.load_model_gpu(model)
                 sdxl_state_dict = model.model.state_dict_for_saving(None, vae.get_sd(), None)
-                for key in sdxl_state_dict:
-                    set_module_tensor_to_device(self.model, key, device=device, dtype=dtype, value=sdxl_state_dict[key])
-                #self.model.load_state_dict(sdxl_state_dict, strict=False)
+                if is_accelerate_available:
+                    for key in sdxl_state_dict:
+                        set_module_tensor_to_device(self.model, key, device=device, dtype=dtype, value=sdxl_state_dict[key])
+                else:
+                    self.model.load_state_dict(sdxl_state_dict, strict=False)
                 if fp8_unet:
                     self.model.model.to(torch.float8_e4m3fn)
                 else:
@@ -906,8 +910,11 @@ high_vram: uses Accelerate to load weights to GPU, faster model loading.
                 self.model.conditioner.embedders[0].tokenizer = CLIPTokenizer.from_pretrained(tokenizer_path)
                 with (init_empty_weights() if is_accelerate_available else nullcontext()):
                     self.model.conditioner.embedders[0].transformer = CLIPTextModel(clip_text_config)
-                for key in clip_l_sd:
-                    set_module_tensor_to_device(self.model.conditioner.embedders[0].transformer, key, device=device, dtype=dtype, value=clip_l_sd[key])
+                if is_accelerate_available:
+                    for key in clip_l_sd:
+                        set_module_tensor_to_device(self.model.conditioner.embedders[0].transformer, key, device=device, dtype=dtype, value=clip_l_sd[key])
+                else:
+                    self.model.conditioner.embedders[0].transformer.load_state_dict(clip_l_sd, strict=False)
                 self.model.conditioner.embedders[0].eval()
                 for param in self.model.conditioner.embedders[0].parameters():
                     param.requires_grad = False
@@ -935,7 +942,7 @@ high_vram: uses Accelerate to load weights to GPU, faster model loading.
             try:
                 print(f'Attempting to load SUPIR model: [{SUPIR_MODEL_PATH}]')
                 supir_state_dict = load_state_dict(SUPIR_MODEL_PATH)
-                if "Q" not in supir_model: #I don't know why this doesn't work with the Q model.
+                if "Q" not in supir_model or not is_accelerate_available: #I don't know why this doesn't work with the Q model. 
                     for key in supir_state_dict:
                         set_module_tensor_to_device(self.model, key, device=device, dtype=dtype, value=supir_state_dict[key])
                 else:

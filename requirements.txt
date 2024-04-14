@@ -6,3 +6,4 @@ open-clip-torch>=2.17.1
 Pillow>=9.4.0
 pytorch-lightning>=2.2.1
 omegaconf
+accelerate
