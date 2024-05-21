@@ -1,0 +1,15 @@
+[project]
+name = "comfyui-supir"
+description = ""
+version = "1.0.0"
+license = "LICENSE"
+dependencies = ["transformers>=4.28.1", "fsspec>=2023.4.0", "kornia>=0.6.9", "open-clip-torch>=2.17.1", "Pillow>=9.4.0", "pytorch-lightning>=2.2.1", "omegaconf", "accelerate"]
+
+[project.urls]
+Repository = "https://github.com/kijai/ComfyUI-SUPIR"
+
+[tool.comfy]
+PublisherId = ""
+DisplayName = "ComfyUI-SUPIR"
+Icon = ""
+Models = [{location = "/checkpoints/model.safetensor", model_url = "https://example.com/model.zip"}]
