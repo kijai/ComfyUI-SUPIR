@@ -9,6 +9,6 @@ dependencies = ["transformers>=4.28.1", "fsspec>=2023.4.0", "kornia>=0.6.9", "op
 Repository = "https://github.com/kijai/ComfyUI-SUPIR"
 
 [tool.comfy]
-PublisherId = ""
+PublisherId = "kijai"
 DisplayName = "ComfyUI-SUPIR"
 Icon = ""
