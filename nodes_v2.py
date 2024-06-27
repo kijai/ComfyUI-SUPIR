@@ -192,14 +192,20 @@ class SUPIR_decode:
         device = mm.get_torch_device()
         mm.unload_all_models()
         samples = latents["samples"]
-        dtype = SUPIR_VAE.dtype
-        orig_H, orig_W = latents["original_size"]
         
         B, H, W, C = samples.shape
                 
         pbar = comfy.utils.ProgressBar(B)
-  
-        SUPIR_VAE.to(device)
+       
+        if mm.should_use_bf16():
+            print("Decoder using bf16")
+            dtype = torch.bfloat16
+        else:
+            print("Decoder using fp32")
+            dtype = torch.float32
+        print("SUPIR decoder using", dtype)
+           
+        SUPIR_VAE.to(dtype).to(device)
         samples = samples.to(device)
 
         if use_tiled_vae:
@@ -220,14 +226,17 @@ class SUPIR_decode:
             autocast_condition = (dtype != torch.float32) and not comfy.model_management.is_device_mps(device)
             with torch.autocast(comfy.model_management.get_autocast_device(device), dtype=dtype) if autocast_condition else nullcontext():
                 sample = 1.0 / 0.13025 * sample
-                decoded_image = SUPIR_VAE.decode(sample.unsqueeze(0)).float()
+                decoded_image = SUPIR_VAE.decode(sample.unsqueeze(0))
                 out.append(decoded_image)
                 pbar.update(1)
 
-        decoded_out= torch.cat(out, dim=0)
-        if decoded_out.shape[2] != orig_H or decoded_out.shape[3] != orig_W:
-            print("Restoring original dimensions: ", orig_W,"x",orig_H)
-            decoded_out = F.interpolate(decoded_out, size=(orig_H, orig_W), mode="bicubic")
+        decoded_out= torch.cat(out, dim=0).float()
+
+        if "original_size" in latents and latents["original_size"] is not None:
+            orig_H, orig_W = latents["original_size"]
+            if decoded_out.shape[2] != orig_H or decoded_out.shape[3] != orig_W:
+                print("Restoring original dimensions: ", orig_W,"x",orig_H)
+                decoded_out = F.interpolate(decoded_out, size=(orig_H, orig_W), mode="bicubic")
 
         decoded_out = torch.clip(decoded_out, 0, 1)
         decoded_out = decoded_out.cpu().to(torch.float32).permute(0, 2, 3, 1)
@@ -360,9 +369,9 @@ class SUPIR_sample:
             "EDM_s_churn": ("INT", {"default": 5, "min": 0, "max": 40, "step": 1}),
             "s_noise": ("FLOAT", {"default": 1.003, "min": 1.0, "max": 1.1, "step": 0.001}),
             "DPMPP_eta": ("FLOAT", {"default": 1.0, "min": 0, "max": 10.0, "step": 0.01}),
-            "control_scale_start": ("FLOAT", {"default": 1.0, "min": 0, "max": 10.0, "step": 0.05}),
-            "control_scale_end": ("FLOAT", {"default": 1.0, "min": 0, "max": 10.0, "step": 0.05}),
-            "restore_cfg": ("FLOAT", {"default": -1.0, "min": -1.0, "max": 20.0, "step": 0.05}),
+            "control_scale_start": ("FLOAT", {"default": 1.0, "min": 0, "max": 10.0, "step": 0.01}),
+            "control_scale_end": ("FLOAT", {"default": 1.0, "min": 0, "max": 10.0, "step": 0.01}),
+            "restore_cfg": ("FLOAT", {"default": -1.0, "min": -1.0, "max": 20.0, "step": 0.01}),
             "keep_model_loaded": ("BOOLEAN", {"default": False}),
             "sampler": (
                     [
@@ -483,7 +492,8 @@ SUPIR Tiles -node for preview to understand how the image is tiled.
                     noised_z = torch.randn_like(sample.unsqueeze(0), device=samples.device)
                 else:
                     print("Using latent from input")
-                    noised_z = sample.unsqueeze(0) * 0.13025
+                    noised_z = torch.randn_like(sample.unsqueeze(0), device=samples.device)
+                    noised_z += sample.unsqueeze(0)
                 if len(positive) != len(samples):
                     print("Tiled sampling")
                     _samples = self.sampler(denoiser, noised_z, cond=positive, uc=negative, x_center=sample.unsqueeze(0), control_scale=control_scale_end,
@@ -517,6 +527,9 @@ SUPIR Tiles -node for preview to understand how the image is tiled.
             samples_out_stacked = torch.cat(out, dim=0)
         else:
             samples_out_stacked = torch.stack(out, dim=0)
+
+        if original_size is None:
+            samples_out_stacked = samples_out_stacked / 0.13025
 
         return ({"samples":samples_out_stacked, "original_size": original_size},)
 
@@ -555,7 +568,14 @@ If a list of captions is given and it matches the incoming image batch, each ima
         
         device = mm.get_torch_device()
         mm.soft_empty_cache()
-        samples = latents["samples"]
+
+        if "original_size" in latents:
+            original_size = latents["original_size"]
+            samples = latents["samples"]
+        else:
+            original_size = None
+            samples = latents["samples"] * 0.13025
+        
         N, H, W, C = samples.shape
         import copy
 
@@ -622,8 +642,13 @@ If a list of captions is given and it matches the incoming image batch, each ima
 
             
         SUPIR_model.conditioner.to('cpu')
+
+        if "original_size" in latents:
+            original_size = latents["original_size"]
+        else:
+            original_size = None
                 
-        return ({"cond": c, "original_size":latents["original_size"]}, {"uncond": uc},)
+        return ({"cond": c, "original_size":original_size}, {"uncond": uc},)
     
 class SUPIR_model_loader:
     @classmethod

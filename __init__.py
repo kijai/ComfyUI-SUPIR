@@ -21,7 +21,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "SUPIR_encode": "SUPIR Encode",
     "SUPIR_decode": "SUPIR Decode",
     "SUPIR_conditioner": "SUPIR Conditioner",
-    "SUPIR_tiles": "SUPIR Tiles",
+    "SUPIR_tiles": "SUPIR Tiles Preview",
     "SUPIR_model_loader_v2": "SUPIR Model Loader (v2)",
     "SUPIR_model_loader_v2_clip": "SUPIR Model Loader (v2) (Clip)"
 }
