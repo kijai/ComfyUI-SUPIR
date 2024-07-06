@@ -2,7 +2,7 @@ from contextlib import nullcontext
 from functools import partial
 from typing import Dict, List, Optional, Tuple, Union
 
-import kornia
+#import kornia
 import numpy as np
 import open_clip
 import torch

@@ -4,7 +4,7 @@ import os
 from functools import partial
 from inspect import isfunction
 
-import fsspec
+#import fsspec
 import numpy as np
 import torch
 from PIL import Image, ImageDraw, ImageFont
