@@ -36,6 +36,9 @@ from ....CKPT_PTH import SDXL_CLIP1_PATH, SDXL_CLIP2_CKPT_PTH
 import comfy.model_management
 device = comfy.model_management.get_torch_device()
 
+import comfy.ops
+ops = comfy.ops.manual_cast
+
 class AbstractEmbModel(nn.Module):
     def __init__(self):
         super().__init__()
@@ -577,7 +580,10 @@ class FrozenOpenCLIPEmbedder2(AbstractEmbModel):
         x = self.model.token_embedding(text)  # [batch_size, n_ctx, d_model]
         x = x + self.model.positional_embedding
         x = x.permute(1, 0, 2)  # NLD -> LND
-        x = self.text_transformer_forward(x, attn_mask=self.model.attn_mask)
+        try:
+            x = self.text_transformer_forward(x, attn_mask=self.model.attn_mask)
+        except:
+            x = self.text_transformer_forward_batch_first(x, attn_mask=self.model.attn_mask)
         if self.legacy:
             x = x[self.layer]
             x = self.model.ln_final(x)
@@ -611,6 +617,22 @@ class FrozenOpenCLIPEmbedder2(AbstractEmbModel):
             else:
                 x = r(x, attn_mask=attn_mask)
         outputs["last"] = x.permute(1, 0, 2)  # LND -> NLD
+        return outputs
+    
+    def text_transformer_forward_batch_first(self, x: torch.Tensor, attn_mask=None):
+        x = x.permute(1, 0, 2) # LND -> NLD
+        outputs = {}
+        for i, r in enumerate(self.model.transformer.resblocks):
+            if i == len(self.model.transformer.resblocks) - 1:
+                outputs["penultimate"] = x
+            if (
+                self.model.transformer.grad_checkpointing
+                and not torch.jit.is_scripting()
+            ):
+                x = checkpoint(r, x, attn_mask)
+            else:
+                x = r(x, attn_mask=attn_mask)
+        outputs["last"] = x
         return outputs
 
     def encode(self, text):
@@ -908,7 +930,7 @@ class SpatialRescaler(nn.Module):
             print(
                 f"Spatial Rescaler mapping from {in_channels} to {out_channels} channels after resizing."
             )
-            self.channel_mapper = nn.Conv2d(
+            self.channel_mapper = ops.Conv2d(
                 in_channels,
                 out_channels,
                 kernel_size=kernel_size,

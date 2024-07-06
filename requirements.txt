@@ -1,7 +1,7 @@
 transformers>=4.28.1
 fsspec>=2023.4.0
 kornia>=0.6.9
-open-clip-torch==2.24.0
+open-clip-torch>=2.24.0
 Pillow>=9.4.0
 pytorch-lightning>=2.2.1
 omegaconf
