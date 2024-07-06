@@ -3,7 +3,8 @@ import functools
 import torch.nn as nn
 
 from ..util import ActNorm
-
+import comfy.ops
+ops = comfy.ops.manual_cast
 
 def weights_init(m):
     classname = m.__class__.__name__
@@ -42,7 +43,7 @@ class NLayerDiscriminator(nn.Module):
         kw = 4
         padw = 1
         sequence = [
-            nn.Conv2d(input_nc, ndf, kernel_size=kw, stride=2, padding=padw),
+            ops.Conv2d(input_nc, ndf, kernel_size=kw, stride=2, padding=padw),
             nn.LeakyReLU(0.2, True),
         ]
         nf_mult = 1
@@ -51,7 +52,7 @@ class NLayerDiscriminator(nn.Module):
             nf_mult_prev = nf_mult
             nf_mult = min(2**n, 8)
             sequence += [
-                nn.Conv2d(
+                ops.Conv2d(
                     ndf * nf_mult_prev,
                     ndf * nf_mult,
                     kernel_size=kw,
@@ -66,7 +67,7 @@ class NLayerDiscriminator(nn.Module):
         nf_mult_prev = nf_mult
         nf_mult = min(2**n_layers, 8)
         sequence += [
-            nn.Conv2d(
+            ops.Conv2d(
                 ndf * nf_mult_prev,
                 ndf * nf_mult,
                 kernel_size=kw,
@@ -79,7 +80,7 @@ class NLayerDiscriminator(nn.Module):
         ]
 
         sequence += [
-            nn.Conv2d(ndf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw)
+            ops.Conv2d(ndf * nf_mult, 1, kernel_size=kw, stride=1, padding=padw)
         ]  # output 1 channel prediction map
         self.main = nn.Sequential(*sequence)
 

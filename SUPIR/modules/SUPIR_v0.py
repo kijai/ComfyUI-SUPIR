@@ -27,6 +27,9 @@ from functools import partial
 import comfy.model_management
 device = comfy.model_management.get_torch_device()
 
+import comfy.ops
+ops = comfy.ops.manual_cast
+
 try:
     import xformers
     import xformers.ops
@@ -77,13 +80,13 @@ class ZeroSFT(nn.Module):
         nhidden = 128
 
         self.mlp_shared = nn.Sequential(
-            nn.Conv2d(label_nc, nhidden, kernel_size=ks, padding=pw),
+            ops.Conv2d(label_nc, nhidden, kernel_size=ks, padding=pw),
             nn.SiLU()
         )
-        self.zero_mul = zero_module(nn.Conv2d(nhidden, norm_nc + concat_channels, kernel_size=ks, padding=pw))
-        self.zero_add = zero_module(nn.Conv2d(nhidden, norm_nc + concat_channels, kernel_size=ks, padding=pw))
-        # self.zero_mul = nn.Conv2d(nhidden, norm_nc + concat_channels, kernel_size=ks, padding=pw)
-        # self.zero_add = nn.Conv2d(nhidden, norm_nc + concat_channels, kernel_size=ks, padding=pw)
+        self.zero_mul = zero_module(ops.Conv2d(nhidden, norm_nc + concat_channels, kernel_size=ks, padding=pw))
+        self.zero_add = zero_module(ops.Conv2d(nhidden, norm_nc + concat_channels, kernel_size=ks, padding=pw))
+        # self.zero_mul = ops.Conv2d(nhidden, norm_nc + concat_channels, kernel_size=ks, padding=pw)
+        # self.zero_add = ops.Conv2d(nhidden, norm_nc + concat_channels, kernel_size=ks, padding=pw)
 
         self.zero_conv = zero_module(conv_nd(2, label_nc, norm_nc, 1, 1, 0))
         self.pre_concat = bool(concat_channels != 0)
@@ -296,7 +299,7 @@ class GLVControl(nn.Module):
                 self.label_emb = nn.Embedding(num_classes, time_embed_dim)
             elif self.num_classes == "continuous":
                 print("setting up linear c_adm embedding layer")
-                self.label_emb = nn.Linear(1, time_embed_dim)
+                self.label_emb = ops.Linear(1, time_embed_dim)
             elif self.num_classes == "timestep":
                 self.label_emb = checkpoint_wrapper_fn(
                     nn.Sequential(

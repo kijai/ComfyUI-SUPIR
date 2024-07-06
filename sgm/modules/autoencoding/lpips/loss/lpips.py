@@ -8,6 +8,8 @@ from torchvision import models
 
 from ..util import get_ckpt_path
 
+import comfy.ops
+ops = comfy.ops.manual_cast
 
 class LPIPS(nn.Module):
     # Learned perceptual metric
@@ -91,7 +93,7 @@ class NetLinLayer(nn.Module):
             else []
         )
         layers += [
-            nn.Conv2d(chn_in, chn_out, 1, stride=1, padding=0, bias=False),
+            ops.Conv2d(chn_in, chn_out, 1, stride=1, padding=0, bias=False),
         ]
         self.model = nn.Sequential(*layers)
 

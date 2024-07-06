@@ -14,9 +14,8 @@ from ..modules.distributions.distributions import DiagonalGaussianDistribution
 from ..modules.ema import LitEma
 from ..util import default, get_obj_from_str, instantiate_from_config
 
-class Conv2d(torch.nn.Conv2d):
-    def reset_parameters(self):
-        return None
+import comfy.ops
+ops = comfy.ops.manual_cast
     
 class AbstractAutoencoder(pl.LightningModule):
     """
@@ -297,8 +296,8 @@ class AutoencoderKL(AutoencodingEngine):
         assert ddconfig["double_z"]
         self.encoder = Encoder(**ddconfig)
         self.decoder = Decoder(**ddconfig)
-        self.quant_conv = Conv2d(2 * ddconfig["z_channels"], 2 * embed_dim, 1)
-        self.post_quant_conv = Conv2d(embed_dim, ddconfig["z_channels"], 1)
+        self.quant_conv = ops.Conv2d(2 * ddconfig["z_channels"], 2 * embed_dim, 1)
+        self.post_quant_conv = ops.Conv2d(embed_dim, ddconfig["z_channels"], 1)
         self.embed_dim = embed_dim
 
         if ckpt_path is not None:

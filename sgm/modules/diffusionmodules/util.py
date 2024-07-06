@@ -19,6 +19,9 @@ import comfy.model_management
 device = comfy.model_management.get_torch_device()
 from contextlib import nullcontext
 
+import comfy.ops
+ops = comfy.ops.manual_cast
+
 def make_beta_schedule(
     schedule,
     n_timestep,
@@ -278,25 +281,17 @@ class GroupNorm32(nn.GroupNorm):
     def forward(self, x):
         # return super().forward(x.float()).type(x.dtype)
         return super().forward(x)
-
-class Conv2d(torch.nn.Conv2d):
-    def reset_parameters(self):
-        return None
-    
-class Linear(torch.nn.Linear):
-    def reset_parameters(self):
-        return None
     
 def conv_nd(dims, *args, **kwargs):
     """
     Create a 1D, 2D, or 3D convolution module.
     """
     if dims == 1:
-        return nn.Conv1d(*args, **kwargs)
+        return ops.Conv1d(*args, **kwargs)
     elif dims == 2:
-        return Conv2d(*args, **kwargs)
+        return ops.Conv2d(*args, **kwargs)
     elif dims == 3:
-        return nn.Conv3d(*args, **kwargs)
+        return ops.Conv3d(*args, **kwargs)
     raise ValueError(f"unsupported dimensions: {dims}")
 
     
@@ -304,7 +299,7 @@ def linear(*args, **kwargs):
     """
     Create a linear module.
     """
-    return Linear(*args, **kwargs)
+    return ops.Linear(*args, **kwargs)
 
 
 def avg_pool_nd(dims, *args, **kwargs):
