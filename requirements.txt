@@ -1,6 +1,6 @@
-transformers>=4.28.1
-open-clip-torch>=2.24.0
-Pillow>=9.4.0
-pytorch-lightning>=2.5.5
+transformers
+open-clip-torch
+Pillow
+pytorch-lightning
 omegaconf
 accelerate
