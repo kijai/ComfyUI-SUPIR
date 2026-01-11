@@ -327,46 +327,26 @@ def xformer_attn_forward(self, h_):
 
     # compute attention
     B, C, H, W = q.shape
-    
-    try:
-        q_xf, k_xf, v_xf = map(lambda x: rearrange(x, 'b c h w -> b (h w) c'), (q, k, v))
+    q, k, v = map(lambda x: rearrange(x, 'b c h w -> b (h w) c'), (q, k, v))
 
-        q_xf, k_xf, v_xf = map(
-            lambda t: t.unsqueeze(3)
-            .reshape(B, t.shape[1], 1, C)
-            .permute(0, 2, 1, 3)
-            .reshape(B * 1, t.shape[1], C)
-            .contiguous(),
-            (q_xf, k_xf, v_xf),
-        )
-        out = xformers.ops.memory_efficient_attention(
-            q_xf, k_xf, v_xf, attn_bias=None, op=self.attention_op)
+    q, k, v = map(
+        lambda t: t.unsqueeze(3)
+        .reshape(B, t.shape[1], 1, C)
+        .permute(0, 2, 1, 3)
+        .reshape(B * 1, t.shape[1], C)
+        .contiguous(),
+        (q, k, v),
+    )
+    out = xformers.ops.memory_efficient_attention(
+        q, k, v, attn_bias=None, op=self.attention_op)
 
-        out = (
-            out.unsqueeze(0)
-            .reshape(B, 1, out.shape[1], C)
-            .permute(0, 2, 1, 3)
-            .reshape(B, out.shape[1], C)
-        )
-        out = rearrange(out, 'b (h w) c -> b c h w', b=B, h=H, w=W, c=C)
-    except NotImplementedError:
-        # Fallback to standard attention if xformers doesn't support this configuration
-        # (e.g., new GPU architectures or unsupported dimensions)
-        b, c, h, w = q.shape
-        q_std = q.reshape(b, c, h*w)
-        q_std = q_std.permute(0, 2, 1)   # b,hw,c
-        k_std = k.reshape(b, c, h*w)  # b,c,hw
-        w_ = torch.bmm(q_std, k_std)     # b,hw,hw    w[b,i,j]=sum_c q[b,i,c]k[b,c,j]
-        w_ = w_ * (int(c)**(-0.5))
-        w_ = torch.nn.functional.softmax(w_, dim=2)
-
-        # attend to values
-        v_std = v.reshape(b, c, h*w)
-        w_ = w_.permute(0, 2, 1)   # b,hw,hw (first hw of k, second of q)
-        # b, c,hw (hw of q) h_[b,c,j] = sum_i v[b,c,i] w_[b,i,j]
-        out = torch.bmm(v_std, w_)
-        out = out.reshape(b, c, h, w)
-    
+    out = (
+        out.unsqueeze(0)
+        .reshape(B, 1, out.shape[1], C)
+        .permute(0, 2, 1, 3)
+        .reshape(B, out.shape[1], C)
+    )
+    out = rearrange(out, 'b (h w) c -> b c h w', b=B, h=H, w=W, c=C)
     out = self.proj_out(out)
     return out
 
@@ -388,8 +368,14 @@ def attn2task(task_queue, net):
         task_queue.append(('pre_norm', net.norm))
         if XFORMERS_IS_AVAILABLE:
             # task_queue.append(('attn', lambda x, net=net: attn_forward_new_xformers(net, x)))
-            task_queue.append(
-                ('attn', lambda x, net=net: xformer_attn_forward(net, x)))
+            # Wrap xformer call with fallback to standard attention on NotImplementedError
+            # (e.g., new GPU architectures or unsupported dimensions)
+            def xformer_with_fallback(x, net=net):
+                try:
+                    return xformer_attn_forward(net, x)
+                except NotImplementedError:
+                    return attn_forward(net, x)
+            task_queue.append(('attn', xformer_with_fallback))
         elif hasattr(F, "scaled_dot_product_attention"):
             task_queue.append(('attn', lambda x, net=net: attn_forward(net, x)))
             #task_queue.append(('attn', lambda x, net=net: attn_forward_new_pt2_0(net, x)))
