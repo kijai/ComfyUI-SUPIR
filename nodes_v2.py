@@ -902,7 +902,10 @@ high_vram: uses Accelerate to load weights to GPU, slightly faster model loading
             try:
                 print(f"Attempting to load SDXL model from node inputs")
                 mm.load_model_gpu(model)
-                sdxl_state_dict = model.model.state_dict_for_saving(None, vae.get_sd(), None)
+                try:
+                    sdxl_state_dict = model.model.state_dict_for_saving(model.model.diffusion_model.state_dict(), vae_state_dict=vae.get_sd())
+                except:
+                    sdxl_state_dict = model.model.state_dict_for_saving(None, vae.get_sd(), None)
                 if is_accelerate_available:
                     for key in sdxl_state_dict:
                         set_module_tensor_to_device(self.model, key, device=device, dtype=dtype, value=sdxl_state_dict[key])
@@ -1085,7 +1088,10 @@ high_vram: uses Accelerate to load weights to GPU, slightly faster model loading
             try:
                 print(f"Attempting to load SDXL model from node inputs")
                 mm.load_model_gpu(model)
-                sdxl_state_dict = model.model.state_dict_for_saving(None, vae.get_sd(), None)
+                try:
+                    sdxl_state_dict = model.model.state_dict_for_saving(model.model.diffusion_model.state_dict(), vae_state_dict=vae.get_sd())
+                except:
+                    sdxl_state_dict = model.model.state_dict_for_saving(None, vae.get_sd(), None)
                 if is_accelerate_available:
                     for key in sdxl_state_dict:
                         set_module_tensor_to_device(self.model, key, device=device, dtype=dtype, value=sdxl_state_dict[key])
