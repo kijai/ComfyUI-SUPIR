@@ -368,8 +368,14 @@ def attn2task(task_queue, net):
         task_queue.append(('pre_norm', net.norm))
         if XFORMERS_IS_AVAILABLE:
             # task_queue.append(('attn', lambda x, net=net: attn_forward_new_xformers(net, x)))
-            task_queue.append(
-                ('attn', lambda x, net=net: xformer_attn_forward(net, x)))
+            # Wrap xformer call with fallback to standard attention on NotImplementedError
+            # (e.g., new GPU architectures or unsupported dimensions)
+            def xformer_with_fallback(x, net=net):
+                try:
+                    return xformer_attn_forward(net, x)
+                except NotImplementedError:
+                    return attn_forward(net, x)
+            task_queue.append(('attn', xformer_with_fallback))
         elif hasattr(F, "scaled_dot_product_attention"):
             task_queue.append(('attn', lambda x, net=net: attn_forward(net, x)))
             #task_queue.append(('attn', lambda x, net=net: attn_forward_new_pt2_0(net, x)))
