@@ -1,8 +1,8 @@
 [project]
 name = "comfyui-supir"
 description = "Wrapper nodes to use SUPIR upscaling process in ComfyUI"
-version = "1.0.2"
-license = "LICENSE"
+version = "1.0.3"
+license = { file = "LICENSE" }
 dependencies = ["transformers>=4.28.1", "fsspec>=2023.4.0", "kornia>=0.6.9", "open-clip-torch>=2.24.0", "Pillow>=9.4.0", "pytorch-lightning>=2.2.1", "omegaconf", "accelerate"]
 
 [project.urls]
