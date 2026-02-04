@@ -21,12 +21,8 @@ try:
 except:
     pass
 
-from transformers import (
-    CLIPTextModel,
-    CLIPTokenizer,
-    CLIPTextConfig,
+from transformers import CLIPTextModel,CLIPTokenizer, CLIPTextConfig
 
-)
 script_directory = os.path.dirname(os.path.abspath(__file__))
 
 def dummy_build_vision_tower(*args, **kwargs):
@@ -46,15 +42,15 @@ def patch_build_vision_tower():
 def build_text_model_from_openai_state_dict(
         state_dict: dict,
         device,
-        cast_dtype=torch.float16,    
+        cast_dtype=torch.float16,
     ):
-   
+
     embed_dim = state_dict["text_projection"].shape[1]
     context_length = state_dict["positional_embedding"].shape[0]
     vocab_size = state_dict["token_embedding.weight"].shape[0]
     transformer_width = state_dict["ln_final.weight"].shape[0]
     transformer_heads = transformer_width // 64
-    transformer_layers = len(set(k.split(".")[2] for k in state_dict if k.startswith(f"transformer.resblocks")))
+    transformer_layers = len(set(k.split(".")[2] for k in state_dict if k.startswith("transformer.resblocks")))
 
     vision_cfg = None
     text_cfg = open_clip.CLIPTextCfg(
@@ -180,15 +176,10 @@ class SUPIR_decode:
             "latents": ("LATENT",),
             "use_tiled_vae": ("BOOLEAN", {"default": True}),
             "decoder_tile_size": ("INT", {"default": 512, "min": 64, "max": 8192, "step": 64}),
-            "decoder_dtype": (
-                [
-                    'bf16',
-                    'fp32',
-                    'auto'
-                ], {
-                    "default": 'auto'
-                }),
-            }
+        },
+            "optional": {
+                    "decoder_dtype": (['bf16', 'fp32', 'auto'], {"default": 'auto'}),
+                }
         }
 
     RETURN_TYPES = ("IMAGE",)
@@ -196,13 +187,13 @@ class SUPIR_decode:
     FUNCTION = "decode"
     CATEGORY = "SUPIR"
 
-    def decode(self, SUPIR_VAE, latents, use_tiled_vae, decoder_tile_size, decoder_dtype):
+    def decode(self, SUPIR_VAE, latents, use_tiled_vae, decoder_tile_size, decoder_dtype="auto"):
         device = mm.get_torch_device()
         mm.unload_all_models()
         samples = latents["samples"]
-        
+
         B, H, W, C = samples.shape
-                
+
         pbar = comfy.utils.ProgressBar(B)
 
         if decoder_dtype == 'auto':
