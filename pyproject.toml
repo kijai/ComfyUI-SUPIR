@@ -12,3 +12,6 @@ Repository = "https://github.com/kijai/ComfyUI-SUPIR"
 PublisherId = "kijai"
 DisplayName = "ComfyUI-SUPIR"
 Icon = ""
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

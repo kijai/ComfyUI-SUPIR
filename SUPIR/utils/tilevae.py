@@ -70,7 +70,7 @@ from einops import rearrange
 import comfy.model_management
 device = comfy.model_management.get_torch_device()
 
-if comfy.model_management.XFORMERS_IS_AVAILABLE:
+if comfy.model_management.XFORMERS_IS_AVAILABLE and torch.cuda.is_available():
     try:
         import xformers
         import xformers.ops
