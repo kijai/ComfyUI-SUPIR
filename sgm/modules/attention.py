@@ -57,6 +57,32 @@ except:
 
 from .diffusionmodules.util import checkpoint
 
+# Maximum number of query-key element pairs before splitting attention on MPS.
+# MPS devices have a buffer size limit (~4 GiB). For fp32, 4 GiB / 4 bytes =
+# 1 billion elements. We use a conservative threshold to leave headroom.
+_MPS_ATTENTION_SPLIT_THRESHOLD = 2**28  # ~268M elements per head
+
+
+def _split_sdp_attention(q, k, v, attn_mask=None, chunk_size=2048):
+    """Chunked scaled dot-product attention for memory-constrained devices.
+
+    Splits queries into chunks to avoid allocating oversized attention buffers
+    that exceed MPS device limits (issue #151).
+    """
+    N = q.shape[2]
+    if N <= chunk_size:
+        return F.scaled_dot_product_attention(q, k, v, attn_mask=attn_mask)
+
+    out = torch.empty_like(q)
+    for start in range(0, N, chunk_size):
+        end = min(start + chunk_size, N)
+        q_chunk = q[:, :, start:end]
+        mask_chunk = attn_mask[:, :, start:end] if attn_mask is not None else None
+        out[:, :, start:end] = F.scaled_dot_product_attention(
+            q_chunk, k, v, attn_mask=mask_chunk
+        )
+    return out
+
 
 def exists(val):
     return val is not None
@@ -273,11 +299,17 @@ class CrossAttention(nn.Module):
         out = einsum('b i j, b j d -> b i d', sim, v)
         """
         ## new
-        with sdp_kernel(**BACKEND_MAP[self.backend]):
-            # print("dispatching into backend", self.backend, "q/k/v shape: ", q.shape, k.shape, v.shape)
-            out = F.scaled_dot_product_attention(
-                q, k, v, attn_mask=mask
-            )  # scale is dim_head ** -0.5 per default
+        # On MPS, F.scaled_dot_product_attention can fail with
+        # "Invalid buffer size" for large sequence lengths (issue #151).
+        # Fall back to chunked attention to keep buffer sizes manageable.
+        n_elements_per_head = q.shape[2] * k.shape[2]
+        if q.device.type == "mps" and n_elements_per_head > _MPS_ATTENTION_SPLIT_THRESHOLD:
+            out = _split_sdp_attention(q, k, v, attn_mask=mask)
+        else:
+            with sdp_kernel(**BACKEND_MAP[self.backend]):
+                out = F.scaled_dot_product_attention(
+                    q, k, v, attn_mask=mask
+                )  # scale is dim_head ** -0.5 per default
 
         del q, k, v
         out = rearrange(out, "b h n d -> b n (h d)", h=h)
