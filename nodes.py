@@ -9,7 +9,7 @@ from nodes import ImageScaleBy
 from nodes import ImageScale
 import torch.cuda
 from .sgm.util import instantiate_from_config
-from .SUPIR.util import convert_dtype, load_state_dict
+from .SUPIR.util import convert_dtype, load_state_dict, safe_dtype
 import open_clip
 from contextlib import contextmanager
 
@@ -196,6 +196,9 @@ class SUPIR_Upscale:
             dtype = convert_dtype(diffusion_dtype)
             model_dtype = diffusion_dtype
 
+        model_dtype = safe_dtype(model_dtype, device)
+        dtype = convert_dtype(model_dtype)
+
         if encoder_dtype == 'auto':
             try:
                 if mm.should_use_bf16():
@@ -209,6 +212,8 @@ class SUPIR_Upscale:
         else:
             vae_dtype = encoder_dtype
             print(f"Encoder using using {vae_dtype}")
+
+        vae_dtype = safe_dtype(vae_dtype, device)
 
         if not hasattr(self, "model") or self.model is None or self.current_config != custom_config:
             self.current_config = custom_config
