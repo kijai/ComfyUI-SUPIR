@@ -50,7 +50,9 @@ try:
     import xformers
     import xformers.ops
 
-    XFORMERS_IS_AVAILABLE = True
+    XFORMERS_IS_AVAILABLE = torch.cuda.is_available()
+    if not XFORMERS_IS_AVAILABLE:
+        print("xformers is installed but no CUDA device found. Processing without...")
 except:
     XFORMERS_IS_AVAILABLE = False
     print("no module 'xformers'. Processing without...")
