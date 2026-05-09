@@ -171,3 +171,12 @@ def convert_dtype(dtype_str):
         return torch.bfloat16
     else:
         raise NotImplementedError
+
+
+def safe_dtype(dtype_str, device, fallback='fp32'):
+    """Fall back from bf16 on MPS devices since MPS doesn't support bfloat16."""
+    import comfy.model_management as mm
+    if dtype_str == 'bf16' and mm.is_device_mps(device):
+        print(f"bf16 not supported on MPS device, using {fallback} instead")
+        return fallback
+    return dtype_str

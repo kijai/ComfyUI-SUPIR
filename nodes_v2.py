@@ -7,7 +7,7 @@ import folder_paths
 import torch.cuda
 import torch.nn.functional as F
 from .sgm.util import instantiate_from_config
-from .SUPIR.util import convert_dtype, load_state_dict
+from .SUPIR.util import convert_dtype, load_state_dict, safe_dtype
 from .sgm.modules.distributions.distributions import DiagonalGaussianDistribution
 import open_clip
 from contextlib import contextmanager, nullcontext
@@ -121,6 +121,7 @@ class SUPIR_encode:
             vae_dtype = encoder_dtype
             print(f"Encoder using {vae_dtype}")
 
+        vae_dtype = safe_dtype(vae_dtype, device)
         dtype = convert_dtype(vae_dtype)
 
         image = image.permute(0, 3, 1, 2)
@@ -210,6 +211,7 @@ class SUPIR_decode:
             vae_dtype = decoder_dtype
             print(f"Decoder using {vae_dtype}")
 
+        vae_dtype = safe_dtype(vae_dtype, device)
         dtype = convert_dtype(vae_dtype)
         SUPIR_VAE.to(dtype).to(device)
         samples = samples.to(device)
@@ -286,7 +288,7 @@ which is expected. Can be replaced with any other denoiser/blur or not used at a
         mm.unload_all_models()
         if encoder_dtype == 'auto':
             try:
-                
+
                 if mm.should_use_bf16():
                     print("Encoder using bf16")
                     vae_dtype = 'bf16'
@@ -299,6 +301,7 @@ which is expected. Can be replaced with any other denoiser/blur or not used at a
             vae_dtype = encoder_dtype
             print(f"Encoder using {vae_dtype}")
 
+        vae_dtype = safe_dtype(vae_dtype, device)
         dtype = convert_dtype(vae_dtype)
 
         if use_tiled_vae:
@@ -723,6 +726,9 @@ Loads the SUPIR model and the selected SDXL model and merges them.
             print(f"Diffusion using {diffusion_dtype}")
             dtype = convert_dtype(diffusion_dtype)
             model_dtype = diffusion_dtype
+
+        model_dtype = safe_dtype(model_dtype, device, fallback='fp16')
+        dtype = convert_dtype(model_dtype)
         
         if not hasattr(self, "model") or self.model is None or self.current_config != custom_config:
             self.current_config = custom_config
@@ -851,6 +857,7 @@ high_vram: uses Accelerate to load weights to GPU, slightly faster model loading
             device = mm.get_torch_device()
         else:
             device = mm.unet_offload_device()
+        compute_device = mm.get_torch_device()
         print("Loading weights to: ", device)
         mm.unload_all_models()
 
@@ -885,6 +892,10 @@ high_vram: uses Accelerate to load weights to GPU, slightly faster model loading
         else:
             print(f"Diffusion using {diffusion_dtype}")
             dtype = convert_dtype(diffusion_dtype)
+
+        if dtype == torch.bfloat16 and mm.is_device_mps(compute_device):
+            print("bf16 not supported on MPS device, using fp16 instead")
+            dtype = torch.float16
         
         if not hasattr(self, "model") or self.model is None or self.current_config != custom_config:
             self.current_config = custom_config
@@ -1028,6 +1039,7 @@ high_vram: uses Accelerate to load weights to GPU, slightly faster model loading
             device = mm.get_torch_device()
         else:
             device = mm.unet_offload_device()
+        compute_device = mm.get_torch_device()
         print("Loading weights to: ", device)
         mm.unload_all_models()
 
@@ -1063,6 +1075,10 @@ high_vram: uses Accelerate to load weights to GPU, slightly faster model loading
         else:
             print(f"Diffusion using {diffusion_dtype}")
             dtype = convert_dtype(diffusion_dtype)
+
+        if dtype == torch.bfloat16 and mm.is_device_mps(compute_device):
+            print("bf16 not supported on MPS device, using fp16 instead")
+            dtype = torch.float16
         
         if not hasattr(self, "model") or self.model is None or self.current_config != custom_config:
             self.current_config = custom_config
