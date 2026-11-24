@@ -1,0 +1,1021 @@
+{
+  "id": "29b0ec5e-3f65-42eb-b9c9-93a8990c895f",
+  "revision": 0,
+  "last_node_id": 22,
+  "last_link_id": 46,
+  "nodes": [
+    {
+      "id": 12,
+      "type": "Reroute",
+      "pos": [
+        894,
+        -87
+      ],
+      "size": [
+        124,
+        26
+      ],
+      "flags": {},
+      "order": 7,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "",
+          "type": "*",
+          "link": 44
+        }
+      ],
+      "outputs": [
+        {
+          "name": "SUPIRMODEL",
+          "type": "SUPIRMODEL",
+          "slot_index": 0,
+          "links": [
+            22,
+            23
+          ]
+        }
+      ],
+      "properties": {
+        "showOutputText": true,
+        "horizontal": false
+      }
+    },
+    {
+      "id": 11,
+      "type": "SUPIR_encode",
+      "pos": [
+        690,
+        21
+      ],
+      "size": [
+        217.8501434326172,
+        126
+      ],
+      "flags": {},
+      "order": 10,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "SUPIR_VAE",
+          "type": "SUPIRVAE",
+          "link": 15
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 16
+        }
+      ],
+      "outputs": [
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "slot_index": 0,
+          "links": [
+            17
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-supir",
+        "ver": "53fc4f82f139e0875e1f4f3716fbeafa073e4242",
+        "Node name for S&R": "SUPIR_encode"
+      },
+      "widgets_values": [
+        true,
+        512,
+        "auto"
+      ]
+    },
+    {
+      "id": 3,
+      "type": "PreviewImage",
+      "pos": [
+        1722,
+        60
+      ],
+      "size": [
+        985.1123046875,
+        988.2251586914062
+      ],
+      "flags": {},
+      "order": 15,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "images",
+          "type": "IMAGE",
+          "link": 27
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.27",
+        "Node name for S&R": "PreviewImage"
+      },
+      "widgets_values": []
+    },
+    {
+      "id": 16,
+      "type": "GetNode",
+      "pos": [
+        2027,
+        -130
+      ],
+      "size": [
+        210,
+        58
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 0,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "links": [
+            29
+          ]
+        }
+      ],
+      "title": "Get_InputImage",
+      "properties": {},
+      "widgets_values": [
+        "InputImage"
+      ],
+      "color": "#2a363b",
+      "bgcolor": "#3f5159"
+    },
+    {
+      "id": 19,
+      "type": "GetNode",
+      "pos": [
+        1739,
+        -142
+      ],
+      "size": [
+        210,
+        58
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 1,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "SUPIRVAE",
+          "type": "SUPIRVAE",
+          "links": [
+            32
+          ]
+        }
+      ],
+      "title": "Get_SUPIRVAE",
+      "properties": {},
+      "widgets_values": [
+        "SUPIRVAE"
+      ],
+      "color": "#2a363b",
+      "bgcolor": "#3f5159"
+    },
+    {
+      "id": 9,
+      "type": "SUPIR_conditioner",
+      "pos": [
+        944,
+        86
+      ],
+      "size": [
+        401.7200012207031,
+        200.86000061035156
+      ],
+      "flags": {},
+      "order": 11,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "SUPIR_model",
+          "type": "SUPIRMODEL",
+          "link": 22
+        },
+        {
+          "name": "latents",
+          "type": "LATENT",
+          "link": 20
+        },
+        {
+          "name": "captions",
+          "shape": 7,
+          "type": "STRING",
+          "link": null
+        }
+      ],
+      "outputs": [
+        {
+          "name": "positive",
+          "type": "SUPIR_cond_pos",
+          "links": [
+            8
+          ]
+        },
+        {
+          "name": "negative",
+          "type": "SUPIR_cond_neg",
+          "slot_index": 1,
+          "links": [
+            9
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-supir",
+        "ver": "53fc4f82f139e0875e1f4f3716fbeafa073e4242",
+        "Node name for S&R": "SUPIR_conditioner"
+      },
+      "widgets_values": [
+        "high quality, detailed, clean image",
+        "bad quality, blurry, messy"
+      ]
+    },
+    {
+      "id": 2,
+      "type": "LoadImage",
+      "pos": [
+        -151,
+        127
+      ],
+      "size": [
+        441.6546630859375,
+        571.2802734375
+      ],
+      "flags": {},
+      "order": 2,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            24,
+            28,
+            33
+          ]
+        },
+        {
+          "name": "MASK",
+          "type": "MASK",
+          "links": null
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.27",
+        "Node name for S&R": "LoadImage"
+      },
+      "widgets_values": [
+        "oldman.jpg",
+        "image"
+      ]
+    },
+    {
+      "id": 14,
+      "type": "ColorMatch",
+      "pos": [
+        2027,
+        -81
+      ],
+      "size": [
+        315,
+        102
+      ],
+      "flags": {},
+      "order": 14,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image_ref",
+          "type": "IMAGE",
+          "link": 29
+        },
+        {
+          "name": "image_target",
+          "type": "IMAGE",
+          "link": 26
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            27,
+            34
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-kjnodes",
+        "ver": "8ecf5cd05e0a1012087b0da90eea9a13674668db",
+        "Node name for S&R": "ColorMatch"
+      },
+      "widgets_values": [
+        "mkl",
+        1
+      ]
+    },
+    {
+      "id": 10,
+      "type": "SUPIR_decode",
+      "pos": [
+        1733,
+        -90
+      ],
+      "size": [
+        258.0101318359375,
+        102
+      ],
+      "flags": {},
+      "order": 13,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "SUPIR_VAE",
+          "type": "SUPIRVAE",
+          "link": 32
+        },
+        {
+          "name": "latents",
+          "type": "LATENT",
+          "link": 12
+        }
+      ],
+      "outputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            26
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-supir",
+        "ver": "53fc4f82f139e0875e1f4f3716fbeafa073e4242",
+        "Node name for S&R": "SUPIR_decode"
+      },
+      "widgets_values": [
+        true,
+        512
+      ]
+    },
+    {
+      "id": 20,
+      "type": "Image Comparer (rgthree)",
+      "pos": [
+        737,
+        379
+      ],
+      "size": [
+        647.1893310546875,
+        642.7651977539062
+      ],
+      "flags": {},
+      "order": 16,
+      "mode": 0,
+      "inputs": [
+        {
+          "dir": 3,
+          "name": "image_a",
+          "type": "IMAGE",
+          "link": 33
+        },
+        {
+          "dir": 3,
+          "name": "image_b",
+          "type": "IMAGE",
+          "link": 34
+        }
+      ],
+      "outputs": [],
+      "properties": {
+        "cnr_id": "rgthree-comfy",
+        "ver": "32142fe476878a354dda6e2d4b5ea98960de3ced",
+        "comparer_mode": "Slide"
+      },
+      "widgets_values": [
+        [
+          {
+            "name": "A",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_cnnnt_00001_.png&type=temp&subfolder=&rand=0.3689175928667995"
+          },
+          {
+            "name": "B",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_cnnnt_00002_.png&type=temp&subfolder=&rand=0.12941772273497254"
+          }
+        ]
+      ]
+    },
+    {
+      "id": 17,
+      "type": "SetNode",
+      "pos": [
+        386,
+        -36
+      ],
+      "size": [
+        210,
+        58
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 8,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "SUPIRVAE",
+          "type": "SUPIRVAE",
+          "link": 45
+        }
+      ],
+      "outputs": [
+        {
+          "name": "SUPIRVAE",
+          "type": "SUPIRVAE",
+          "links": [
+            46
+          ]
+        }
+      ],
+      "title": "Set_SUPIRVAE",
+      "properties": {
+        "previousName": "SUPIRVAE"
+      },
+      "widgets_values": [
+        "SUPIRVAE"
+      ]
+    },
+    {
+      "id": 7,
+      "type": "SUPIR_sample",
+      "pos": [
+        1386,
+        -87
+      ],
+      "size": [
+        315,
+        454
+      ],
+      "flags": {},
+      "order": 12,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "SUPIR_model",
+          "type": "SUPIRMODEL",
+          "link": 23
+        },
+        {
+          "name": "latents",
+          "type": "LATENT",
+          "link": 17
+        },
+        {
+          "name": "positive",
+          "type": "SUPIR_cond_pos",
+          "link": 8
+        },
+        {
+          "name": "negative",
+          "type": "SUPIR_cond_neg",
+          "link": 9
+        }
+      ],
+      "outputs": [
+        {
+          "name": "latent",
+          "type": "LATENT",
+          "slot_index": 0,
+          "links": [
+            12
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-supir",
+        "ver": "53fc4f82f139e0875e1f4f3716fbeafa073e4242",
+        "Node name for S&R": "SUPIR_sample"
+      },
+      "widgets_values": [
+        174277455657960,
+        "fixed",
+        10,
+        2,
+        1.5,
+        5,
+        1.0030000000000001,
+        1,
+        1,
+        0.9,
+        1,
+        false,
+        "RestoreDPMPP2MSampler",
+        1024,
+        512
+      ]
+    },
+    {
+      "id": 15,
+      "type": "SetNode",
+      "pos": [
+        347.81890869140625,
+        589.0696411132812
+      ],
+      "size": [
+        210,
+        58
+      ],
+      "flags": {
+        "collapsed": true
+      },
+      "order": 5,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "link": 28
+        }
+      ],
+      "outputs": [
+        {
+          "name": "*",
+          "type": "*",
+          "links": null
+        }
+      ],
+      "title": "Set_InputImage",
+      "properties": {
+        "previousName": "InputImage"
+      },
+      "widgets_values": [
+        "InputImage"
+      ],
+      "color": "#2a363b",
+      "bgcolor": "#3f5159"
+    },
+    {
+      "id": 13,
+      "type": "ImageResize+",
+      "pos": [
+        346.36199951171875,
+        297.7850036621094
+      ],
+      "size": [
+        315,
+        218
+      ],
+      "flags": {},
+      "order": 4,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 24
+        }
+      ],
+      "outputs": [
+        {
+          "name": "IMAGE",
+          "type": "IMAGE",
+          "slot_index": 0,
+          "links": [
+            25
+          ]
+        },
+        {
+          "name": "width",
+          "type": "INT",
+          "links": null
+        },
+        {
+          "name": "height",
+          "type": "INT",
+          "links": null
+        }
+      ],
+      "properties": {
+        "aux_id": "kijai/ComfyUI_essentials",
+        "ver": "76e9d1e4399bd025ce8b12c290753d58f9f53e93",
+        "Node name for S&R": "ImageResize+"
+      },
+      "widgets_values": [
+        1536,
+        1536,
+        "lanczos",
+        "keep proportion",
+        "always",
+        16
+      ]
+    },
+    {
+      "id": 22,
+      "type": "CheckpointLoaderSimple",
+      "pos": [
+        -643,
+        -137
+      ],
+      "size": [
+        529.3912963867188,
+        98
+      ],
+      "flags": {},
+      "order": 3,
+      "mode": 0,
+      "inputs": [],
+      "outputs": [
+        {
+          "name": "MODEL",
+          "type": "MODEL",
+          "links": [
+            35
+          ]
+        },
+        {
+          "name": "CLIP",
+          "type": "CLIP",
+          "slot_index": 1,
+          "links": [
+            39
+          ]
+        },
+        {
+          "name": "VAE",
+          "type": "VAE",
+          "slot_index": 2,
+          "links": [
+            40
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfy-core",
+        "ver": "0.3.27",
+        "Node name for S&R": "CheckpointLoaderSimple"
+      },
+      "widgets_values": [
+        "SDXL\\juggernautXL_v9Rdphoto2Lightning.safetensors"
+      ]
+    },
+    {
+      "id": 5,
+      "type": "SUPIR_first_stage",
+      "pos": [
+        376.9737548828125,
+        20
+      ],
+      "size": [
+        287.20001220703125,
+        170
+      ],
+      "flags": {},
+      "order": 9,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "SUPIR_VAE",
+          "type": "SUPIRVAE",
+          "link": 46
+        },
+        {
+          "name": "image",
+          "type": "IMAGE",
+          "link": 25
+        }
+      ],
+      "outputs": [
+        {
+          "name": "SUPIR_VAE",
+          "type": "SUPIRVAE",
+          "slot_index": 0,
+          "links": [
+            15
+          ]
+        },
+        {
+          "name": "denoised_image",
+          "type": "IMAGE",
+          "slot_index": 1,
+          "links": [
+            16
+          ]
+        },
+        {
+          "name": "denoised_latents",
+          "type": "LATENT",
+          "slot_index": 2,
+          "links": [
+            20
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-supir",
+        "ver": "53fc4f82f139e0875e1f4f3716fbeafa073e4242",
+        "Node name for S&R": "SUPIR_first_stage"
+      },
+      "widgets_values": [
+        true,
+        512,
+        512,
+        "auto"
+      ]
+    },
+    {
+      "id": 21,
+      "type": "SUPIR_model_loader_v2",
+      "pos": [
+        -64,
+        -137
+      ],
+      "size": [
+        412.73406982421875,
+        170
+      ],
+      "flags": {},
+      "order": 6,
+      "mode": 0,
+      "inputs": [
+        {
+          "name": "model",
+          "type": "MODEL",
+          "link": 35
+        },
+        {
+          "name": "clip",
+          "type": "CLIP",
+          "link": 39
+        },
+        {
+          "name": "vae",
+          "type": "VAE",
+          "link": 40
+        }
+      ],
+      "outputs": [
+        {
+          "name": "SUPIR_model",
+          "type": "SUPIRMODEL",
+          "slot_index": 0,
+          "links": [
+            44
+          ]
+        },
+        {
+          "name": "SUPIR_VAE",
+          "type": "SUPIRVAE",
+          "slot_index": 1,
+          "links": [
+            45
+          ]
+        }
+      ],
+      "properties": {
+        "cnr_id": "comfyui-supir",
+        "ver": "53fc4f82f139e0875e1f4f3716fbeafa073e4242",
+        "Node name for S&R": "SUPIR_model_loader_v2"
+      },
+      "widgets_values": [
+        "SUPIR-v0F_fp16.safetensors",
+        false,
+        "auto",
+        false
+      ]
+    }
+  ],
+  "links": [
+    [
+      8,
+      9,
+      0,
+      7,
+      2,
+      "SUPIR_cond_pos"
+    ],
+    [
+      9,
+      9,
+      1,
+      7,
+      3,
+      "SUPIR_cond_neg"
+    ],
+    [
+      12,
+      7,
+      0,
+      10,
+      1,
+      "LATENT"
+    ],
+    [
+      15,
+      5,
+      0,
+      11,
+      0,
+      "SUPIRVAE"
+    ],
+    [
+      16,
+      5,
+      1,
+      11,
+      1,
+      "IMAGE"
+    ],
+    [
+      17,
+      11,
+      0,
+      7,
+      1,
+      "LATENT"
+    ],
+    [
+      20,
+      5,
+      2,
+      9,
+      1,
+      "LATENT"
+    ],
+    [
+      22,
+      12,
+      0,
+      9,
+      0,
+      "SUPIRMODEL"
+    ],
+    [
+      23,
+      12,
+      0,
+      7,
+      0,
+      "SUPIRMODEL"
+    ],
+    [
+      24,
+      2,
+      0,
+      13,
+      0,
+      "IMAGE"
+    ],
+    [
+      25,
+      13,
+      0,
+      5,
+      1,
+      "IMAGE"
+    ],
+    [
+      26,
+      10,
+      0,
+      14,
+      1,
+      "IMAGE"
+    ],
+    [
+      27,
+      14,
+      0,
+      3,
+      0,
+      "IMAGE"
+    ],
+    [
+      28,
+      2,
+      0,
+      15,
+      0,
+      "*"
+    ],
+    [
+      29,
+      16,
+      0,
+      14,
+      0,
+      "IMAGE"
+    ],
+    [
+      32,
+      19,
+      0,
+      10,
+      0,
+      "SUPIRVAE"
+    ],
+    [
+      33,
+      2,
+      0,
+      20,
+      0,
+      "IMAGE"
+    ],
+    [
+      34,
+      14,
+      0,
+      20,
+      1,
+      "IMAGE"
+    ],
+    [
+      35,
+      22,
+      0,
+      21,
+      0,
+      "MODEL"
+    ],
+    [
+      39,
+      22,
+      1,
+      21,
+      1,
+      "CLIP"
+    ],
+    [
+      40,
+      22,
+      2,
+      21,
+      2,
+      "VAE"
+    ],
+    [
+      44,
+      21,
+      0,
+      12,
+      0,
+      "*"
+    ],
+    [
+      45,
+      21,
+      1,
+      17,
+      0,
+      "SUPIRVAE"
+    ],
+    [
+      46,
+      17,
+      0,
+      5,
+      0,
+      "SUPIRVAE"
+    ]
+  ],
+  "groups": [],
+  "config": {},
+  "extra": {
+    "ds": {
+      "scale": 0.7400249944258529,
+      "offset": [
+        542.7855837176115,
+        382.7955981028858
+      ]
+    },
+    "frontendVersion": "1.16.7",
+    "VHS_latentpreview": true,
+    "VHS_latentpreviewrate": 0,
+    "VHS_MetadataImage": true,
+    "VHS_KeepIntermediate": true
+  },
+  "version": 0.4
+}
